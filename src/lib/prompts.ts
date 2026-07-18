@@ -3,6 +3,8 @@
  * Keeping them here lets teammates tune a module's behaviour in one place.
  */
 
+import type { DocType } from "@/lib/docsOptions";
+import { DOC_TYPES } from "@/lib/docsOptions";
 import type { TestFramework } from "@/lib/testFrameworks";
 
 export const reviewPrompt = {
@@ -222,14 +224,104 @@ describe("subject", () => {
   }
 }
 
-export const docsPrompt = {
-  system: `You are Project Nova's technical writer. Produce clear developer documentation in Markdown for the provided code or API.
-Include:
+const DOC_SECTION_GUIDES: Record<DocType, string> = {
+  "user-manual": `Structure:
 ## Overview
+## Who this is for
+## Getting started
+## Common tasks (numbered steps)
+## Tips & troubleshooting
+## Glossary (optional)
+Write for end users; prefer workflows over implementation detail.`,
+  technical: `Structure:
+## Overview
+## Architecture
+## Key modules
+## Data flow
+## Extension points
+## Examples (fenced code)
+Write for engineers; be accurate about APIs that appear in the source.`,
+  "api-reference": `Structure:
+## Overview
+## Authentication (if applicable)
+## Endpoints / Functions
+For each: signature or method+path, parameters, returns, errors, example.
+## Examples
+Prefer precise tables. If HTTP, document method, path, request/response shapes.`,
+  readme: `Structure:
+## What it is
+## Prerequisites
+## Install
+## Configuration
+## Quickstart
+## Next steps / links
+Keep it scannable and actionable for a first-time visitor.`,
+  runbook: `Structure:
+## Scope
+## Deploy / rollback
+## Health checks & monitoring
+## Common incidents
+## Recovery procedures
+## Escalation
+Be procedural and concrete — operators should be able to follow under pressure.`,
+  onboarding: `Structure:
+## Welcome & goals
+## Access & local setup
+## Repo map
+## First week checklist
+## Norms (PRs, tests, style)
+## Where to get help
+Orient a new contributor quickly without drowning them.`,
+};
+
+function docsSystemFor(docType: DocType): string {
+  const meta = DOC_TYPES.find((t) => t.id === docType)!;
+  return `You are Project Nova's technical writer. Produce clear documentation in Markdown.
+Document type: ${meta.label}
+Focus: ${meta.promptFocus}
+
+${DOC_SECTION_GUIDES[docType]}
+
+Rules:
+- Prefer directory/project scope: use folder structure and multiple files together; do not treat the input as a single isolated file.
+- Be accurate and concise. Do not invent APIs, files, or behaviours that are not supported by the input.
+- Use fenced code blocks for examples.
+- If the input is insufficient, state assumptions briefly rather than fabricating detail.`;
+}
+
+export const docsPrompt = {
+  /** Default system prompt (technical docs) — used by Traceability and fallbacks. */
+  system: docsSystemFor("technical"),
+
+  systemFor(docType: DocType): string {
+    return docsSystemFor(docType);
+  },
+
+  mock(docType: DocType = "technical"): string {
+    const label = DOC_TYPES.find((t) => t.id === docType)?.label ?? "Documentation";
+    return `# ${label}
+
+Auto-generated documentation (**mock / offline sample**).
+
+## Overview
+This sample shows the structure Project Nova produces for **${label.toLowerCase()}** when no live LLM response is available.
+
 ## Usage
-## API Reference (functions/endpoints, parameters, return values)
-## Examples (with fenced code blocks)
-Be accurate and concise. If it is an HTTP API, document method, path, request/response shapes.`,
+1. Choose a documentation type.
+2. Provide source via codebase paste/upload, GitHub, or the guided interview.
+3. Generate and download the Markdown.
+
+## Examples
+
+\`\`\`ts
+// Example placeholder — replace with live generation
+export function greet(name: string) {
+  return \`Hello, \${name}\`;
+}
+\`\`\`
+
+> Provide \`GROQ_API_KEY\` or \`ANTHROPIC_API_KEY\` to generate documentation from your real inputs.`;
+  },
 };
 
 export const ragPrompt = {
