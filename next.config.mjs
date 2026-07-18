@@ -12,6 +12,9 @@ const nextConfig = {
   turbopack: {
     root: __dirname,
   },
+  // transformers.js ships a native ONNX runtime; keep it out of the bundle
+  // so it loads correctly at runtime on the server.
+  serverExternalPackages: ["@huggingface/transformers"],
 };
 
 export default nextConfig;
