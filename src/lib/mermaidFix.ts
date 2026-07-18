@@ -65,8 +65,11 @@ export function normalizeMermaidChart(raw: string): string {
     chart = chart.replace(/\s*-->>\s*/g, "-->>");
   }
 
-  // Flowcharts: quote node labels that contain special chars if written as A[Next.js App]
-  // Mermaid usually allows this; skip aggressive rewrites.
+  // Flowcharts: LLMs often write -->|label|> instead of -->|label|
+  // (extra > after the label pipe breaks Mermaid 11 parse).
+  if (/^\s*(flowchart|graph)\b/im.test(chart) || /-->/.test(chart)) {
+    chart = chart.replace(/(\|[^\n|]*?)\|>(\s*)/g, "$1|$2");
+  }
 
   return chart.trim();
 }
