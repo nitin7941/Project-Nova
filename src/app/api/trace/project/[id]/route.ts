@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import {
   acknowledgeArtifact,
   deleteProject,
+  ensureProject,
   getProject,
   toGraph,
   updateArtifactContent,
 } from "@/lib/trace/store";
+import type { TraceGraph, TraceProject } from "@/lib/trace/types";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,9 +19,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const { artifactId, content, action } = await req.json();
+    const { artifactId, content, action, snapshot } = await req.json();
     if (!artifactId || typeof artifactId !== "string") {
       return NextResponse.json({ error: "'artifactId' is required." }, { status: 400 });
+    }
+
+    if (snapshot && typeof snapshot === "object" && snapshot.id === id) {
+      await ensureProject(snapshot as TraceProject | TraceGraph);
     }
 
     if (action === "acknowledge") {

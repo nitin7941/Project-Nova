@@ -20,9 +20,30 @@ function summarize(rec: IndexRecord): IndexSummary {
 
 export async function saveIndex(rec: IndexRecord): Promise<IndexSummary> {
   cache.set(rec.id, rec);
-  await fs.mkdir(INDEX_DIR, { recursive: true });
-  await fs.writeFile(path.join(INDEX_DIR, `${rec.id}.json`), JSON.stringify(rec));
+  try {
+    await fs.mkdir(INDEX_DIR, { recursive: true });
+    await fs.writeFile(path.join(INDEX_DIR, `${rec.id}.json`), JSON.stringify(rec));
+  } catch (err) {
+    console.warn("[rag/store] disk persist skipped:", err instanceof Error ? err.message : err);
+  }
   return summarize(rec);
+}
+
+/** Rehydrate an index from a client snapshot (serverless instances don't share /tmp). */
+export async function ensureIndex(rec: IndexRecord): Promise<IndexRecord> {
+  const existing = await getIndex(rec.id);
+  if (existing) return existing;
+  if (!rec.chunks?.length || !rec.vectors?.length) {
+    throw new Error("Index snapshot is incomplete.");
+  }
+  cache.set(rec.id, rec);
+  try {
+    await fs.mkdir(INDEX_DIR, { recursive: true });
+    await fs.writeFile(path.join(INDEX_DIR, `${rec.id}.json`), JSON.stringify(rec));
+  } catch {
+    /* best-effort */
+  }
+  return rec;
 }
 
 export async function getIndex(id: string): Promise<IndexRecord | null> {

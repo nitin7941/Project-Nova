@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { completeStream, isLiveMode } from "@/lib/claude";
 import { ragPrompt } from "@/lib/prompts";
-import { search } from "@/lib/rag/store";
-import type { RetrievedChunk } from "@/lib/rag/types";
+import { ensureIndex, search } from "@/lib/rag/store";
+import type { IndexRecord, RetrievedChunk } from "@/lib/rag/types";
 
 export const maxDuration = 120;
 
@@ -30,12 +30,16 @@ Set \`ANTHROPIC_API_KEY\` to have Claude answer using this context.`;
 
 export async function POST(req: Request) {
   try {
-    const { indexId, question } = await req.json();
+    const { indexId, question, snapshot } = await req.json();
     if (!indexId || typeof indexId !== "string") {
       return NextResponse.json({ error: "Field 'indexId' is required." }, { status: 400 });
     }
     if (!question || typeof question !== "string") {
       return NextResponse.json({ error: "Field 'question' is required." }, { status: 400 });
+    }
+
+    if (snapshot && typeof snapshot === "object" && snapshot.id === indexId) {
+      await ensureIndex(snapshot as IndexRecord);
     }
 
     const { embedOne } = await import("@/lib/rag/embeddings");
