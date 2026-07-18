@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  --nova-bg: #0a0a0f;
+  --nova-panel: #12121b;
+  --nova-border: #24243044;
+}
+
+html,
+body {
+  background: var(--nova-bg);
+  color: #e7e7ee;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background-image:
+    radial-gradient(60rem 60rem at 80% -10%, rgba(124, 58, 237, 0.18), transparent 60%),
+    radial-gradient(50rem 50rem at -10% 10%, rgba(37, 99, 235, 0.16), transparent 55%);
+  background-attachment: fixed;
+}
+
+/* Rendered markdown output */
+.prose-nova h1,
+.prose-nova h2,
+.prose-nova h3 {
+  font-weight: 700;
+  color: #f5f5ff;
+  margin: 1.1em 0 0.5em;
+  line-height: 1.25;
+}
+.prose-nova h1 { font-size: 1.4rem; }
+.prose-nova h2 { font-size: 1.15rem; }
+.prose-nova h3 { font-size: 1rem; }
+.prose-nova p { margin: 0.6em 0; line-height: 1.6; }
+.prose-nova ul { margin: 0.5em 0; padding-left: 1.25rem; list-style: disc; }
+.prose-nova li { margin: 0.25em 0; }
+.prose-nova strong { color: #fff; font-weight: 600; }
+.prose-nova code {
+  background: #1c1c28;
+  border: 1px solid var(--nova-border);
+  border-radius: 6px;
+  padding: 0.1em 0.35em;
+  font-size: 0.85em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.prose-nova pre {
+  background: #0d0d15;
+  border: 1px solid var(--nova-border);
+  border-radius: 12px;
+  padding: 1rem;
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+.prose-nova pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
