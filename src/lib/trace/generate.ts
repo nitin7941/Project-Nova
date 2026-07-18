@@ -1,4 +1,4 @@
-import { designPrompt, testsPrompt, docsPrompt } from "@/lib/prompts";
+import { designPrompt, testsPrompt, docsPrompt, reviewPrompt } from "@/lib/prompts";
 import type { ArtifactKind } from "./types";
 
 interface GenSpec {
@@ -18,9 +18,24 @@ export const GEN: Record<Exclude<ArtifactKind, "requirement">, GenSpec> = {
     maxTokens: 3000,
     instruction: (_k, content) => `Turn these requirements into a system design:\n\n${content}`,
   },
+  review: {
+    title: "Review",
+    system:
+      reviewPrompt.system +
+      `\n\nWhen the subject is a requirement or design document (not application source), ` +
+      `adapt the same severity sections to that artifact: correctness vs stated goals, ` +
+      `security/privacy gaps, performance risks, and maintainability of the proposed approach. ` +
+      `If project code context is provided, ground findings in how THIS repo actually works.`,
+    maxTokens: 2048,
+    instruction: (k, content) =>
+      k === "design" || k === "requirement"
+        ? `Produce a structured engineering review of this ${k}. ` +
+          `It is the subject under review (not necessarily raw source code).\n\n${content}`
+        : `Review the following ${k}:\n\n${content}`,
+  },
   tests: {
     title: "Tests",
-    // Greenfield-style: parent is a requirement or design, not source code.
+    // Greenfield-style: parent is a requirement, design, or review — not source code.
     system: testsPrompt.systemNew,
     maxTokens: 2048,
     instruction: (k, content) =>
