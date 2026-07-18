@@ -51,6 +51,13 @@ export const DOC_TYPES = [
     promptFocus:
       "Write an onboarding guide for new contributors: repo map, local setup, first useful tasks, coding norms, and where to ask for help.",
   },
+  {
+    id: "openapi",
+    label: "OpenAPI / Swagger Spec",
+    summary: "Machine-readable OpenAPI 3.1 spec (YAML) for HTTP APIs.",
+    promptFocus:
+      "Produce a valid OpenAPI 3.1 specification for the HTTP API: paths, operations, parameters, request/response schemas, reusable components, and examples.",
+  },
 ] as const;
 
 export type DocType = (typeof DOC_TYPES)[number]["id"];
@@ -245,6 +252,33 @@ export const INTERVIEW_QUESTIONS: Record<DocType, InterviewQuestion[]> = {
       placeholder: "e.g. Add a FAQ doc type; improve interview question copy",
     },
   ],
+  openapi: [
+    {
+      id: "apiName",
+      label: "API name and version",
+      placeholder: "e.g. Project Nova API, v1.0.0",
+    },
+    {
+      id: "baseUrl",
+      label: "Base URL / servers",
+      placeholder: "e.g. https://api.example.com or /api",
+    },
+    {
+      id: "auth",
+      label: "Authentication scheme (if any)",
+      placeholder: "e.g. Bearer JWT; or none for the hackathon build",
+    },
+    {
+      id: "endpoints",
+      label: "Endpoints (method, path, purpose)",
+      placeholder: "e.g. POST /api/docs — generate docs; GET /api/providers — list LLM providers",
+    },
+    {
+      id: "schemas",
+      label: "Key request/response fields",
+      placeholder: "e.g. /api/docs body: { docType, source, code?, answers? } → { text, mode }",
+    },
+  ],
 };
 
 export function isDocType(value: unknown): value is DocType {
@@ -266,5 +300,10 @@ export function docTypeLabel(id: DocType): string {
 }
 
 export function downloadFilename(docType: DocType): string {
-  return `${docType}.md`;
+  return docType === "openapi" ? "openapi.yaml" : `${docType}.md`;
+}
+
+/** OpenAPI output is a raw spec; other doc types are Markdown documents. */
+export function isSpecDocType(docType: DocType): boolean {
+  return docType === "openapi";
 }

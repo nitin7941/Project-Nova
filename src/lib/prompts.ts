@@ -272,10 +272,36 @@ Be procedural and concrete — operators should be able to follow under pressure
 ## Norms (PRs, tests, style)
 ## Where to get help
 Orient a new contributor quickly without drowning them.`,
+  openapi: `Output format:
+Return EXACTLY ONE fenced code block tagged \`yaml\` containing a complete, valid OpenAPI 3.1 document. No prose before or after the block.
+The document must include:
+- openapi: 3.1.0
+- info (title, version, short description)
+- servers (use the provided base URL, else a sensible default like /api)
+- paths: each endpoint with its HTTP method(s), summary, parameters, requestBody (with schema), and responses (status codes with schemas)
+- components/schemas: reusable request and response models referenced via $ref
+- at least one example value per operation (request and/or response)
+Document ONLY endpoints/behaviour supported by the input; never invent endpoints or fields.`,
 };
+
+function isSpecDoc(docType: DocType): boolean {
+  return docType === "openapi";
+}
 
 function docsSystemFor(docType: DocType): string {
   const meta = DOC_TYPES.find((t) => t.id === docType)!;
+  if (isSpecDoc(docType)) {
+    return `You are Project Nova's API specification engine. Generate a machine-readable OpenAPI/Swagger spec for the provided HTTP API.
+Focus: ${meta.promptFocus}
+
+${DOC_SECTION_GUIDES[docType]}
+
+Rules:
+- Output ONLY the spec inside the single fenced code block — no commentary before or after.
+- The spec MUST be valid OpenAPI 3.1 and internally consistent (every $ref resolves).
+- Infer paths, methods, and schemas from the provided source/answers; do NOT invent endpoints.
+- If information is missing, use conservative, clearly-typed placeholders rather than fabricating behaviour.`;
+  }
   return `You are Project Nova's technical writer. Produce clear documentation in Markdown.
 Document type: ${meta.label}
 Focus: ${meta.promptFocus}
@@ -299,6 +325,62 @@ export const docsPrompt = {
 
   mock(docType: DocType = "technical"): string {
     const label = DOC_TYPES.find((t) => t.id === docType)?.label ?? "Documentation";
+    if (isSpecDoc(docType)) {
+      return `\`\`\`yaml
+openapi: 3.1.0
+info:
+  title: Project Nova API (mock sample)
+  version: 1.0.0
+  description: Offline sample spec — set GROQ_API_KEY or ANTHROPIC_API_KEY for a real spec.
+servers:
+  - url: /api
+paths:
+  /docs:
+    post:
+      summary: Generate documentation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocsRequest'
+      responses:
+        '200':
+          description: Generated documentation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocsResponse'
+        '400':
+          description: Missing required input
+components:
+  schemas:
+    DocsRequest:
+      type: object
+      required: [docType, source]
+      properties:
+        docType:
+          type: string
+          example: openapi
+        source:
+          type: string
+          enum: [codebase, github, interview]
+        code:
+          type: string
+        answers:
+          type: object
+          additionalProperties:
+            type: string
+    DocsResponse:
+      type: object
+      properties:
+        text:
+          type: string
+        mode:
+          type: string
+          enum: [live, free]
+\`\`\``;
+    }
     return `# ${label}
 
 Auto-generated documentation (**mock / offline sample**).

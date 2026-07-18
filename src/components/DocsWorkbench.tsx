@@ -12,9 +12,11 @@ import {
   INTERVIEW_QUESTIONS,
   LANGUAGE_OPTIONS,
   downloadFilename,
+  isSpecDocType,
   type DocSource,
   type DocType,
 } from "@/lib/docsOptions";
+import { extractCodeBlock } from "@/lib/testFrameworks";
 
 const fieldClass =
   "w-full rounded-lg border border-white/10 bg-[#0d0d15] px-2.5 py-1.5 text-xs text-zinc-300 outline-none focus:border-sky-500/60";
@@ -222,14 +224,19 @@ export function DocsWorkbench({ feature }: { feature: Feature }) {
 
   async function copyOutput() {
     if (!output) return;
-    await navigator.clipboard.writeText(output);
+    const text = isSpecDocType(docType) ? extractCodeBlock(output) : output;
+    await navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
 
   function downloadOutput() {
     if (!output) return;
-    const blob = new Blob([output + "\n"], { type: "text/markdown" });
+    const spec = isSpecDocType(docType);
+    const content = spec ? extractCodeBlock(output) : output;
+    const blob = new Blob([content + "\n"], {
+      type: spec ? "text/yaml" : "text/markdown",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
