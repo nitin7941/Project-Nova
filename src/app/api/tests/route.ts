@@ -14,8 +14,9 @@ import {
 
 /**
  * POST /api/tests
- * projectMode=existing → requirements + source → unit tests
- * projectMode=new      → requirements only → test-case catalogue + skeleton
+ * projectMode=existing → source (required) + optional requirements → unit tests
+ *   If requirements omitted, infer behaviour from source/folder.
+ * projectMode=new → requirements required → test-case catalogue + skeleton
  */
 export async function POST(req: Request) {
   try {
@@ -33,6 +34,8 @@ export async function POST(req: Request) {
       repo,
       branch,
       sourceLabel,
+      projectTree,
+      requirementsInferred,
     } = body as {
       projectMode?: string;
       requirements?: string;
@@ -46,6 +49,8 @@ export async function POST(req: Request) {
       repo?: string;
       branch?: string;
       sourceLabel?: string;
+      projectTree?: string;
+      requirementsInferred?: boolean;
     };
 
     const mode: ProjectMode = isProjectMode(projectMode) ? projectMode : "existing";
@@ -57,10 +62,12 @@ export async function POST(req: Request) {
     const shouldMock = mockDependencies !== false;
     const reqText = typeof requirements === "string" ? requirements.trim() : "";
     const source = typeof code === "string" ? code.trim() : "";
+    const tree = typeof projectTree === "string" ? projectTree.trim() : "";
+    const inferReqs = Boolean(requirementsInferred) || !reqText;
 
-    if (!reqText) {
+    if (mode === "new" && !reqText) {
       return NextResponse.json(
-        { error: "Requirements file content is required." },
+        { error: "New project mode needs a requirements file." },
         { status: 400 },
       );
     }
@@ -69,7 +76,7 @@ export async function POST(req: Request) {
       return NextResponse.json(
         {
           error:
-            "Existing project mode needs source from the repo/branch (load a module or paste code).",
+            "Existing project needs source code — select a local folder or load from GitHub.",
         },
         { status: 400 },
       );
@@ -97,8 +104,19 @@ export async function POST(req: Request) {
         framework: selected,
         coverageFocus: focus,
         testStyle: style,
+        requirementsInferred: false,
       });
     }
+
+    const reqSection = inferReqs
+      ? [
+          "## Requirements",
+          "No requirements document was provided. INFER intended behaviour from the source (and folder structure if present), then generate unit tests for that behaviour.",
+          reqText ? `(Optional notes from user/README)\n${reqText}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : ["## Requirements file", reqText].join("\n");
 
     const result = await complete({
       system: testsPrompt.systemExisting,
@@ -108,13 +126,14 @@ export async function POST(req: Request) {
         `Test style: ${style}`,
         `Coverage focus: ${focus} — ${COVERAGE_FOCUS_HINTS[focus]}`,
         `Mock external dependencies: ${shouldMock ? "yes" : "no"}`,
-        entry ? `Focus entry point / symbol: ${entry}` : "Focus entry point: (entire provided source)",
+        entry ? `Focus entry point / symbol: ${entry}` : "Focus entry point: (main public APIs in provided source)",
         repo ? `Repository: ${repo}` : null,
         branch ? `Branch / ref: ${branch}` : null,
-        sourceLabel ? `Source file: ${sourceLabel}` : null,
+        sourceLabel ? `Source label: ${sourceLabel}` : null,
+        `Requirements mode: ${inferReqs ? "infer from source" : "explicit document"}`,
+        tree ? `## Folder structure\n\`\`\`\n${tree}\n\`\`\`` : null,
         "",
-        "## Requirements file",
-        reqText,
+        reqSection,
         "",
         "## Source under test (existing project)",
         source,
@@ -122,7 +141,7 @@ export async function POST(req: Request) {
         .filter(Boolean)
         .join("\n"),
       mock: testsPrompt.mockExisting(selected),
-      maxTokens: 3072,
+      maxTokens: 4096,
     });
 
     return NextResponse.json({
@@ -131,6 +150,7 @@ export async function POST(req: Request) {
       framework: selected,
       coverageFocus: focus,
       testStyle: style,
+      requirementsInferred: inferReqs,
     });
   } catch (err) {
     console.error("[tests]", err);

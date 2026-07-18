@@ -1,41 +1,36 @@
 /**
  * Dual-mode Unit Test Generator:
- * - existing: requirements + source → generate tests → validate
- * - new: requirements only → generate test cases
- * Input method (paste / upload / GitHub) is a user choice — not a prerequisite step.
+ * - existing: local folder or GitHub → generate + validate (requirements optional)
+ * - new: requirements (typed or from GitHub) → test cases
  */
 
 export const PROJECT_MODES = [
   {
     id: "existing",
     label: "Existing project",
-    summary: "Requirements + source → unit tests, then validate.",
+    summary: "Local folder or GitHub → unit tests → validate.",
   },
   {
     id: "new",
     label: "New project",
-    summary: "Requirements only → test cases before implementation exists.",
+    summary: "Requirements → test cases before implementation exists.",
   },
 ] as const;
 
 export type ProjectMode = (typeof PROJECT_MODES)[number]["id"];
 
-/** How the user supplies content — chosen in UI, not listed as process steps. */
 export const INPUT_METHODS = [
   {
-    id: "paste",
-    label: "Paste",
-    hint: "Paste requirements and source into text areas",
-  },
-  {
-    id: "upload",
-    label: "Upload",
-    hint: "Upload local requirements and source files",
+    id: "folder",
+    label: "Local folder",
+    hint: "Select a project folder — Nova reads structure and source files",
+    existingOnly: true,
   },
   {
     id: "github",
     label: "GitHub",
     hint: "Load files from a GitHub repo and branch",
+    existingOnly: false,
   },
 ] as const;
 
@@ -65,17 +60,16 @@ export const TEST_STYLES = [
 
 export type TestStyle = (typeof TEST_STYLES)[number]["id"];
 
-/** What you need — not how you provide it (paste/upload/GitHub). */
 export const EXISTING_PREREQUISITES = [
   {
-    id: "requirements",
-    label: "Requirements",
-    detail: "Feature / acceptance criteria for the behaviour under test.",
+    id: "source",
+    label: "Project source",
+    detail: "Local folder or GitHub — Nova reads the code.",
   },
   {
-    id: "source",
-    label: "Source under test",
-    detail: "Existing module or code you want unit tests for.",
+    id: "requirements",
+    label: "Requirements (optional)",
+    detail: "If present, used as reference. If missing, inferred from the code.",
   },
   {
     id: "framework",
@@ -85,7 +79,7 @@ export const EXISTING_PREREQUISITES = [
   {
     id: "actions",
     label: "Generate & validate",
-    detail: "Generate unit tests, then validate them against requirements + source.",
+    detail: "Generate unit tests, then validate against source (+ requirements if any).",
   },
 ] as const;
 
@@ -93,7 +87,7 @@ export const NEW_PREREQUISITES = [
   {
     id: "requirements",
     label: "Requirements",
-    detail: "Product / feature requirements for the new system.",
+    detail: "Type them here or load from GitHub.",
   },
   {
     id: "framework",

@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Markdown } from "@/components/Markdown";
 import type { Feature } from "@/lib/features";
+import { scanLocalProject, type ScannedProject } from "@/lib/localProject";
 import {
   TEST_FRAMEWORK_OPTIONS,
   downloadMeta,
@@ -30,13 +31,11 @@ const labelClass = "mb-1 block text-[11px] font-medium uppercase tracking-wide t
 type ResultTab = "generated" | "validation";
 
 export function TestsWorkbench({ feature }: { feature: Feature }) {
-  const reqFileRef = useRef<HTMLInputElement>(null);
-  const sourceFileRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const [projectMode, setProjectMode] = useState<ProjectMode>("existing");
-  const [inputMethod, setInputMethod] = useState<InputMethod>("paste");
+  const [inputMethod, setInputMethod] = useState<InputMethod>("folder");
 
-  // GitHub fields (shown only when inputMethod === "github")
   const [repo, setRepo] = useState("");
   const [branch, setBranch] = useState("main");
   const [githubToken, setGithubToken] = useState("");
@@ -49,6 +48,9 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
   const [reqLabel, setReqLabel] = useState("");
   const [code, setCode] = useState("");
   const [sourceLabel, setSourceLabel] = useState("");
+  const [projectTree, setProjectTree] = useState("");
+  const [folderMeta, setFolderMeta] = useState<ScannedProject | null>(null);
+  const [requirementsInferred, setRequirementsInferred] = useState(true);
 
   const [framework, setFramework] = useState<TestFramework>("jest");
   const [language, setLanguage] = useState("");
@@ -64,22 +66,54 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
   const [validationMode, setValidationMode] = useState<"live" | "mock" | null>(null);
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [fetching, setFetching] = useState<"req" | "source" | "both" | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+
+  const availableMethods = useMemo(
+    () =>
+      INPUT_METHODS.filter((m) => projectMode === "existing" || !m.existingOnly),
+    [projectMode],
+  );
 
   const prerequisites =
     projectMode === "existing" ? EXISTING_PREREQUISITES : NEW_PREREQUISITES;
 
   const canGenerate =
-    Boolean(requirements.trim()) &&
-    (projectMode === "new" || Boolean(code.trim()));
+    projectMode === "new"
+      ? Boolean(requirements.trim())
+      : Boolean(code.trim());
 
   const canValidate =
-    projectMode === "existing" &&
-    Boolean(requirements.trim()) &&
-    Boolean(code.trim()) &&
-    Boolean(output.trim());
+    projectMode === "existing" && Boolean(code.trim()) && Boolean(output.trim());
+
+  async function onSelectFolder(fileList: FileList | null) {
+    if (!fileList?.length) return;
+    setScanning(true);
+    setError("");
+    try {
+      const scanned = await scanLocalProject(fileList);
+      setFolderMeta(scanned);
+      setCode(scanned.sourceBundle);
+      setProjectTree(scanned.tree);
+      setSourceLabel(`${scanned.rootName}/ (${scanned.files.length} source files)`);
+      if (scanned.requirements) {
+        setRequirements(scanned.requirements);
+        setReqLabel(scanned.requirementsPath || "requirements");
+        setRequirementsInferred(false);
+      } else {
+        setRequirements("");
+        setReqLabel("");
+        setRequirementsInferred(true);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to scan folder.");
+      setFolderMeta(null);
+    } finally {
+      setScanning(false);
+    }
+  }
 
   async function loadGitHubFile(kind: "req" | "source") {
     setFetching(kind);
@@ -104,9 +138,12 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
       if (kind === "req") {
         setRequirements(data.content);
         setReqLabel(label);
+        setRequirementsInferred(false);
       } else {
         setCode(data.content);
         setSourceLabel(label);
+        setProjectTree("");
+        setFolderMeta(null);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "GitHub fetch failed.");
@@ -115,50 +152,16 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
     }
   }
 
-  async function loadAllFromGitHub() {
-    setFetching("both");
-    setError("");
-    try {
-      await loadGitHubFile("req");
-      if (projectMode === "existing") {
-        await loadGitHubFile("source");
-      }
-    } finally {
-      setFetching(null);
-    }
-  }
-
-  function onUpload(kind: "req" | "source", file: File | null) {
-    if (!file) return;
-    if (file.size > 200_000) {
-      setError("File is too large (max ~200KB).");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = String(reader.result || "");
-      if (kind === "req") {
-        setRequirements(text);
-        setReqLabel(file.name);
-      } else {
-        setCode(text);
-        setSourceLabel(file.name);
-      }
-      setError("");
-    };
-    reader.onerror = () => setError("Could not read that file.");
-    reader.readAsText(file);
-  }
-
   async function generate() {
-    if (!requirements.trim()) {
-      setError("Add requirements first (via your chosen input option).");
+    if (projectMode === "new" && !requirements.trim()) {
+      setError("New project mode needs requirements.");
       return;
     }
     if (projectMode === "existing" && !code.trim()) {
-      setError("Existing project needs source code under test.");
+      setError("Select a local folder or provide source code first.");
       return;
     }
+    const infer = projectMode === "existing" && !requirements.trim();
     setLoading(true);
     setError("");
     setOutput("");
@@ -167,13 +170,14 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
     setValidationMode(null);
     setResultTab("generated");
     setCopied(false);
+    setRequirementsInferred(infer);
     try {
       const res = await fetch(feature.api, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectMode,
-          requirements,
+          requirements: requirements || undefined,
           code: projectMode === "existing" ? code : undefined,
           language,
           framework,
@@ -184,12 +188,17 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
           repo: inputMethod === "github" ? repo || undefined : undefined,
           branch: inputMethod === "github" ? branch || undefined : undefined,
           sourceLabel: sourceLabel || undefined,
+          projectTree: projectTree || undefined,
+          requirementsInferred: infer,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Request failed");
       setOutput(data.text);
       setMode(data.mode);
+      if (typeof data.requirementsInferred === "boolean") {
+        setRequirementsInferred(data.requirementsInferred);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
@@ -212,13 +221,15 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          requirements,
+          requirements: requirements || undefined,
           code,
           tests: output,
           repo: inputMethod === "github" ? repo || undefined : undefined,
           branch: inputMethod === "github" ? branch || undefined : undefined,
           sourceLabel: sourceLabel || undefined,
           framework,
+          projectTree: projectTree || undefined,
+          requirementsInferred: !requirements.trim() || requirementsInferred,
         }),
       });
       const data = await res.json();
@@ -276,6 +287,9 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
     setSourceLabel("");
     setSourceUrl("");
     setSourcePath("");
+    setProjectTree("");
+    setFolderMeta(null);
+    setRequirementsInferred(true);
     setOutput("");
     setValidation("");
     setError("");
@@ -283,14 +297,23 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
     setValidationMode(null);
     setCopied(false);
     setEntryPoint("");
-    if (reqFileRef.current) reqFileRef.current.value = "";
-    if (sourceFileRef.current) sourceFileRef.current.value = "";
+    if (folderInputRef.current) folderInputRef.current.value = "";
+  }
+
+  function switchProjectMode(next: ProjectMode) {
+    setProjectMode(next);
+    setValidation("");
+    setValidationMode(null);
+    setResultTab("generated");
+    setError("");
+    setInputMethod(next === "existing" ? "folder" : "github");
   }
 
   const activeText = resultTab === "validation" ? validation : output;
   const activeMode = resultTab === "validation" ? validationMode : mode;
-  const busy = loading || validating || fetching !== null;
-  const selectedMethod = INPUT_METHODS.find((m) => m.id === inputMethod)!;
+  const busy = loading || validating || scanning || fetching !== null;
+  const selectedMethod =
+    availableMethods.find((m) => m.id === inputMethod) || availableMethods[0];
 
   return (
     <div>
@@ -303,12 +326,12 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{feature.name}</h1>
           <p className="text-zinc-400">
-            Choose project type and how you provide inputs, then generate and validate unit tests.
+            Existing project: Local folder or GitHub. Requirements optional (inferred from code if
+            missing). New project: provide requirements, then generate test cases.
           </p>
         </div>
       </div>
 
-      {/* 1. Project type */}
       <section className="mb-4">
         <h2 className={labelClass}>Project type</h2>
         <div className="mt-1 flex flex-wrap gap-2">
@@ -316,13 +339,7 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
             <button
               key={m.id}
               type="button"
-              onClick={() => {
-                setProjectMode(m.id);
-                setValidation("");
-                setValidationMode(null);
-                setResultTab("generated");
-                setError("");
-              }}
+              onClick={() => switchProjectMode(m.id)}
               className={`rounded-xl px-4 py-2.5 text-left text-sm transition ${
                 projectMode === m.id
                   ? "bg-emerald-500/20 text-emerald-200 ring-1 ring-emerald-500/40"
@@ -336,7 +353,6 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
         </div>
       </section>
 
-      {/* What you need (no input-method steps) */}
       <section className="mb-4 rounded-2xl border border-white/10 bg-[#12121b] p-4">
         <h2 className="text-sm font-semibold text-zinc-200">What you need</h2>
         <ul className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -349,11 +365,10 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
         </ul>
       </section>
 
-      {/* 2. Input method choice */}
       <section className="mb-4">
         <h2 className={labelClass}>How do you want to provide inputs?</h2>
-        <div className="mt-1 grid gap-2 sm:grid-cols-3">
-          {INPUT_METHODS.map((m) => (
+        <div className="mt-1 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {availableMethods.map((m) => (
             <button
               key={m.id}
               type="button"
@@ -372,95 +387,99 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
             </button>
           ))}
         </div>
-        <p className="mt-2 text-[11px] text-zinc-500">{selectedMethod.hint}</p>
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         <div className="space-y-4">
-          {/* Dynamic input UI based on chosen option */}
           <section className="rounded-2xl border border-white/10 bg-[#12121b] p-4">
             <h2 className="mb-3 text-sm font-semibold text-zinc-200">
               Inputs · {selectedMethod.label}
             </h2>
 
-            {inputMethod === "paste" && (
-              <div className="space-y-4">
-                <div>
-                  <label className={labelClass}>Requirements</label>
-                  <textarea
-                    value={requirements}
-                    onChange={(e) => setRequirements(e.target.value)}
-                    placeholder="Paste feature requirements / acceptance criteria…"
-                    spellCheck={false}
-                    className="h-36 w-full resize-none rounded-xl border border-white/10 bg-[#0d0d15] p-3 font-mono text-sm text-zinc-100 outline-none focus:border-emerald-500/60"
-                  />
-                </div>
-                {projectMode === "existing" && (
-                  <div>
-                    <label className={labelClass}>Source under test</label>
-                    <textarea
-                      value={code}
-                      onChange={(e) => setCode(e.target.value)}
-                      placeholder="// Paste the existing module to unit-test…"
-                      spellCheck={false}
-                      className="h-44 w-full resize-none rounded-xl border border-white/10 bg-[#0d0d15] p-3 font-mono text-sm text-zinc-100 outline-none focus:border-emerald-500/60"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {inputMethod === "upload" && (
-              <div className="space-y-4">
-                <div className="rounded-xl border border-dashed border-white/15 bg-[#0d0d15] p-4">
-                  <label className={labelClass}>Requirements file</label>
-                  <input
-                    ref={reqFileRef}
-                    type="file"
-                    accept=".md,.txt,.json,.yml,.yaml"
-                    className="hidden"
-                    onChange={(e) => onUpload("req", e.target.files?.[0] ?? null)}
-                  />
+            {inputMethod === "folder" && projectMode === "existing" && (
+              <div className="space-y-3">
+                <input
+                  ref={folderInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => void onSelectFolder(e.target.files)}
+                  {...({
+                    webkitdirectory: "",
+                    directory: "",
+                  } as React.InputHTMLAttributes<HTMLInputElement>)}
+                />
+                <div className="rounded-xl border border-dashed border-emerald-500/30 bg-emerald-500/5 p-5 text-center">
                   <button
                     type="button"
-                    onClick={() => reqFileRef.current?.click()}
-                    className="rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-300 hover:bg-white/5"
+                    onClick={() => folderInputRef.current?.click()}
+                    disabled={scanning}
+                    className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                   >
-                    Choose requirements file…
+                    {scanning ? "Scanning folder…" : "Select project folder…"}
                   </button>
-                  {reqLabel && (
-                    <p className="mt-2 text-[11px] text-emerald-400/80">Loaded: {reqLabel}</p>
-                  )}
-                  {requirements && (
-                    <p className="mt-1 text-[11px] text-zinc-500">
-                      {requirements.split("\n").length} lines ready
-                    </p>
-                  )}
+                  <p className="mt-2 text-[11px] text-zinc-500">
+                    Skips node_modules/.git/dist. Uses requirements.md if found; otherwise infers
+                    from code.
+                  </p>
                 </div>
-                {projectMode === "existing" && (
-                  <div className="rounded-xl border border-dashed border-white/15 bg-[#0d0d15] p-4">
-                    <label className={labelClass}>Source file</label>
-                    <input
-                      ref={sourceFileRef}
-                      type="file"
-                      accept=".ts,.tsx,.js,.jsx,.mjs,.cjs,.py,.java,.go,.rs,.kt,.cs,.txt"
-                      className="hidden"
-                      onChange={(e) => onUpload("source", e.target.files?.[0] ?? null)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => sourceFileRef.current?.click()}
-                      className="rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-300 hover:bg-white/5"
-                    >
-                      Choose source file…
-                    </button>
-                    {sourceLabel && (
-                      <p className="mt-2 text-[11px] text-emerald-400/80">Loaded: {sourceLabel}</p>
+
+                {folderMeta && (
+                  <div className="space-y-2 rounded-xl border border-white/5 bg-[#0d0d15] p-3">
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="font-medium text-zinc-200">{folderMeta.rootName}</span>
+                      <span className="text-zinc-500">
+                        {folderMeta.files.length} source files
+                        {folderMeta.truncated ? " · truncated" : ""}
+                        {folderMeta.skippedCount
+                          ? ` · skipped ${folderMeta.skippedCount}`
+                          : ""}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          folderMeta.requirementsInferred
+                            ? "bg-amber-500/15 text-amber-300"
+                            : "bg-emerald-500/15 text-emerald-300"
+                        }`}
+                      >
+                        {folderMeta.requirementsInferred
+                          ? "No requirements file · will infer"
+                          : `Requirements: ${folderMeta.requirementsPath}`}
+                      </span>
+                    </div>
+                    <pre className="max-h-40 overflow-auto rounded-lg bg-black/30 p-2 font-mono text-[10px] text-zinc-400">
+                      {folderMeta.tree}
+                    </pre>
+                    {!folderMeta.requirementsInferred && (
+                      <details className="text-xs text-zinc-400">
+                        <summary className="cursor-pointer text-zinc-300">
+                          Edit detected requirements
+                        </summary>
+                        <textarea
+                          value={requirements}
+                          onChange={(e) => {
+                            setRequirements(e.target.value);
+                            setRequirementsInferred(!e.target.value.trim());
+                          }}
+                          className="mt-2 h-28 w-full resize-none rounded-lg border border-white/10 bg-[#0a0a0f] p-2 font-mono text-xs text-zinc-200"
+                        />
+                      </details>
                     )}
-                    {code && (
-                      <p className="mt-1 text-[11px] text-zinc-500">
-                        {code.split("\n").length} lines ready
-                      </p>
+                    {folderMeta.requirementsInferred && (
+                      <div>
+                        <label className={labelClass}>
+                          Optional requirements (leave empty to auto-infer)
+                        </label>
+                        <textarea
+                          value={requirements}
+                          onChange={(e) => {
+                            setRequirements(e.target.value);
+                            setRequirementsInferred(!e.target.value.trim());
+                          }}
+                          placeholder="Optional: add acceptance criteria…"
+                          className="h-24 w-full resize-none rounded-lg border border-white/10 bg-[#0a0a0f] p-2 font-mono text-xs text-zinc-200"
+                        />
+                      </div>
                     )}
                   </div>
                 )}
@@ -502,20 +521,23 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className={labelClass}>Requirements path</label>
+                    <label className={labelClass}>
+                      Requirements path {projectMode === "existing" ? "(optional)" : ""}
+                    </label>
                     <input
                       value={reqPath}
                       onChange={(e) => setReqPath(e.target.value)}
                       placeholder="docs/requirements.md"
                       className={fieldClass}
                     />
-                    <label className={`${labelClass} mt-2`}>Or requirements file URL</label>
-                    <input
-                      value={reqUrl}
-                      onChange={(e) => setReqUrl(e.target.value)}
-                      placeholder="https://github.com/…/blob/…/requirements.md"
-                      className={fieldClass}
-                    />
+                    <button
+                      type="button"
+                      onClick={() => void loadGitHubFile("req")}
+                      disabled={fetching !== null}
+                      className="mt-2 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-50"
+                    >
+                      Load requirements
+                    </button>
                   </div>
                   {projectMode === "existing" && (
                     <div>
@@ -526,46 +548,15 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
                         placeholder="src/services/billing.ts"
                         className={fieldClass}
                       />
-                      <label className={`${labelClass} mt-2`}>Or source file URL</label>
-                      <input
-                        value={sourceUrl}
-                        onChange={(e) => setSourceUrl(e.target.value)}
-                        placeholder="https://github.com/…/blob/…/src/…"
-                        className={fieldClass}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => void loadGitHubFile("source")}
+                        disabled={fetching !== null}
+                        className="mt-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 disabled:opacity-50"
+                      >
+                        Load source
+                      </button>
                     </div>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => void loadAllFromGitHub()}
-                    disabled={fetching !== null}
-                    className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-300 disabled:opacity-50"
-                  >
-                    {fetching === "both" || fetching
-                      ? "Loading from GitHub…"
-                      : projectMode === "existing"
-                        ? "Load requirements + source"
-                        : "Load requirements"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void loadGitHubFile("req")}
-                    disabled={fetching !== null}
-                    className="rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-50"
-                  >
-                    Load requirements only
-                  </button>
-                  {projectMode === "existing" && (
-                    <button
-                      type="button"
-                      onClick={() => void loadGitHubFile("source")}
-                      disabled={fetching !== null}
-                      className="rounded-lg border border-white/10 px-3 py-2 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-50"
-                    >
-                      Load source only
-                    </button>
                   )}
                 </div>
                 {(reqLabel || sourceLabel) && (
@@ -574,35 +565,42 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
                     {sourceLabel && <p>Source: {sourceLabel}</p>}
                   </div>
                 )}
-                {(requirements || code) && (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {requirements && (
-                      <div>
-                        <label className={labelClass}>Requirements preview</label>
-                        <textarea
-                          value={requirements}
-                          onChange={(e) => setRequirements(e.target.value)}
-                          className="h-28 w-full resize-none rounded-xl border border-white/10 bg-[#0d0d15] p-2 font-mono text-xs text-zinc-100 outline-none"
-                        />
-                      </div>
-                    )}
-                    {projectMode === "existing" && code && (
-                      <div>
-                        <label className={labelClass}>Source preview</label>
-                        <textarea
-                          value={code}
-                          onChange={(e) => setCode(e.target.value)}
-                          className="h-28 w-full resize-none rounded-xl border border-white/10 bg-[#0d0d15] p-2 font-mono text-xs text-zinc-100 outline-none"
-                        />
-                      </div>
-                    )}
+                <div>
+                  <label className={labelClass}>
+                    Requirements{" "}
+                    {projectMode === "existing" ? "(optional — inferred if empty)" : ""}
+                  </label>
+                  <textarea
+                    value={requirements}
+                    onChange={(e) => {
+                      setRequirements(e.target.value);
+                      setRequirementsInferred(
+                        projectMode === "existing" && !e.target.value.trim(),
+                      );
+                    }}
+                    placeholder={
+                      projectMode === "existing"
+                        ? "Optional — leave empty to infer from source…"
+                        : "Requirements for the new system (or load from GitHub above)…"
+                    }
+                    spellCheck={false}
+                    className="h-36 w-full resize-none rounded-xl border border-white/10 bg-[#0d0d15] p-3 font-mono text-sm text-zinc-100 outline-none focus:border-emerald-500/60"
+                  />
+                </div>
+                {projectMode === "existing" && code && (
+                  <div>
+                    <label className={labelClass}>Loaded source preview</label>
+                    <textarea
+                      value={code}
+                      onChange={(e) => setCode(e.target.value)}
+                      className="h-36 w-full resize-none rounded-xl border border-white/10 bg-[#0d0d15] p-3 font-mono text-xs text-zinc-100 outline-none"
+                    />
                   </div>
                 )}
               </div>
             )}
           </section>
 
-          {/* Framework options + primary actions */}
           <section className="rounded-2xl border border-white/10 bg-[#12121b] p-4">
             <h2 className="mb-3 text-sm font-semibold text-zinc-200">Test options</h2>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -715,12 +713,18 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
               >
                 Clear
               </button>
+              {projectMode === "existing" && canGenerate && (
+                <span className="text-[11px] text-zinc-500">
+                  {requirements.trim()
+                    ? "Using provided requirements"
+                    : "Will auto-infer requirements from source"}
+                </span>
+              )}
               {error && <span className="text-sm text-red-400">{error}</span>}
             </div>
           </section>
         </div>
 
-        {/* Results */}
         <section className="rounded-2xl border border-white/10 bg-[#12121b] p-4 xl:sticky xl:top-20 xl:self-start">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex gap-1">
@@ -785,14 +789,14 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
             ) : (
               <p className="text-sm text-zinc-500">
                 {busy
-                  ? validating
-                    ? "Validating tests…"
-                    : loading
-                      ? "Generating…"
-                      : "Loading inputs…"
+                  ? scanning
+                    ? "Reading project folder…"
+                    : validating
+                      ? "Validating tests…"
+                      : "Generating…"
                   : projectMode === "existing"
-                    ? "Pick an input option, provide requirements + source, then Generate unit tests → Validate tests."
-                    : "Pick an input option, provide requirements, then Generate test cases."}
+                    ? "Select a local folder or GitHub source, then Generate unit tests → Validate tests."
+                    : "Load or enter requirements (GitHub), then Generate test cases."}
               </p>
             )}
           </div>

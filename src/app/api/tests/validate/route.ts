@@ -4,12 +4,23 @@ import { testsPrompt } from "@/lib/prompts";
 
 /**
  * POST /api/tests/validate
- * Existing-project only: validate generated tests against requirements + source.
+ * Existing-project: validate generated tests against source (+ optional requirements).
+ * If requirements are missing, validate against behaviour inferred from source.
  */
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { requirements, code, tests, repo, branch, sourceLabel, framework } = body as {
+    const {
+      requirements,
+      code,
+      tests,
+      repo,
+      branch,
+      sourceLabel,
+      framework,
+      projectTree,
+      requirementsInferred,
+    } = body as {
       requirements?: string;
       code?: string;
       tests?: string;
@@ -17,21 +28,32 @@ export async function POST(req: Request) {
       branch?: string;
       sourceLabel?: string;
       framework?: string;
+      projectTree?: string;
+      requirementsInferred?: boolean;
     };
 
     const reqText = typeof requirements === "string" ? requirements.trim() : "";
     const source = typeof code === "string" ? code.trim() : "";
     const suite = typeof tests === "string" ? tests.trim() : "";
+    const tree = typeof projectTree === "string" ? projectTree.trim() : "";
+    const inferReqs = Boolean(requirementsInferred) || !reqText;
 
-    if (!reqText || !source || !suite) {
+    if (!source || !suite) {
       return NextResponse.json(
-        {
-          error:
-            "Validation needs requirements, source under test, and the generated test suite.",
-        },
+        { error: "Validation needs source under test and the generated test suite." },
         { status: 400 },
       );
     }
+
+    const reqSection = inferReqs
+      ? [
+          "## Requirements",
+          "No explicit requirements document. Infer intended behaviour from the source and validate the suite against that + the APIs present.",
+          reqText ? `Notes:\n${reqText}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : ["## Requirements file", reqText].join("\n");
 
     const result = await complete({
       system: testsPrompt.systemValidate,
@@ -39,10 +61,11 @@ export async function POST(req: Request) {
         framework ? `Framework: ${framework}` : null,
         repo ? `Repository: ${repo}` : null,
         branch ? `Branch / ref: ${branch}` : null,
-        sourceLabel ? `Source file: ${sourceLabel}` : null,
+        sourceLabel ? `Source label: ${sourceLabel}` : null,
+        `Requirements mode: ${inferReqs ? "infer from source" : "explicit document"}`,
+        tree ? `## Folder structure\n\`\`\`\n${tree}\n\`\`\`` : null,
         "",
-        "## Requirements file",
-        reqText,
+        reqSection,
         "",
         "## Source under test",
         source,
@@ -56,7 +79,7 @@ export async function POST(req: Request) {
       maxTokens: 2048,
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, requirementsInferred: inferReqs });
   } catch (err) {
     console.error("[tests/validate]", err);
     return NextResponse.json({ error: "Failed to validate tests." }, { status: 500 });

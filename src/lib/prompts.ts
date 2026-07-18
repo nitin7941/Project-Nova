@@ -36,13 +36,15 @@ Reviewed the snippet in **mock mode** (no API key set). Overall structure is rea
 
 export const testsPrompt = {
   systemExisting: `You are Project Nova's test engineer for an EXISTING codebase.
-Given (1) a requirements file and (2) source code from a repo/branch, generate idiomatic unit tests.
+You receive source from a project (single module or a folder bundle with structure) and optionally a requirements document.
 Rules:
 - Use EXACTLY the requested framework (Jest, Vitest, pytest, or JUnit).
 - Tests must exercise the PROVIDED source APIs only — do not invent symbols.
-- Map requirements/acceptance criteria to concrete test cases where they apply to this module.
+- If a requirements document is provided, map its acceptance criteria to concrete tests.
+- If requirements are MISSING or marked as "infer from source", first infer the intended behaviour from the code (and folder structure if present), then generate tests for that behaviour. Briefly note inferred requirements in one short sentence before the code block.
+- When multiple files are provided, generate a coherent suite covering the main public modules (prefer src/lib/app/services over tests/config).
 - Honor coverage focus, test style, entry point, and mock-dependencies preferences.
-- Return ONLY a single fenced code block of tests, preceded by one short sentence naming the framework.`,
+- Return ONLY a single fenced code block of tests (or multiple fenced blocks if several files need separate suites), preceded by one short sentence naming the framework.`,
 
   systemNew: `You are Project Nova's QA analyst for a NEW (greenfield) system.
 Given a requirements file only (no implementation yet), produce a test-case package.
@@ -58,12 +60,13 @@ One fenced code block using EXACTLY the requested framework (placeholders OK whe
 - Be concrete and measurable — avoid vague "works correctly" expectations.`,
 
   systemValidate: `You are Project Nova's test validator for an EXISTING project.
-Given requirements, source under test, and a generated test suite, validate the tests.
+Given source under test, a generated test suite, and optional requirements (which may have been inferred from the code), validate the tests.
+If requirements were inferred, evaluate against both the stated/inferred behaviour and the actual source APIs.
 Structure your Markdown answer as:
 ## Verdict
 PASS | PASS_WITH_GAPS | FAIL — one-line reason
 ## Coverage vs requirements
-Which requirements are covered / partially covered / missing
+Which requirements (explicit or inferred) are covered / partially covered / missing
 ## Alignment with source
 API mismatches, brittle assertions, missing mocks, unreachable paths
 ## Suggested fixes
