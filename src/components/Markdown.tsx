@@ -1,7 +1,11 @@
+"use client";
+
+import { MermaidDiagram } from "@/components/MermaidDiagram";
+
 /**
- * Tiny, dependency-free Markdown renderer.
+ * Tiny Markdown renderer with Mermaid fence support.
  * Handles headings, bold, inline code, fenced code blocks, and bullet lists.
- * All input is HTML-escaped first, so it is safe to dangerouslySetInnerHTML.
+ * Non-mermaid content is HTML-escaped first, so it is safe to dangerouslySetInnerHTML.
  */
 
 function escapeHtml(s: string): string {
@@ -27,8 +31,8 @@ export function markdownToHtml(md: string): string {
   const flushPara = () => {
     if (para.length) {
       out.push(`<p>${renderInline(para.join(" "))}</p>`);
-      para = [];
     }
+    para = [];
   };
   const closeList = () => {
     if (inList) {
@@ -93,11 +97,52 @@ export function markdownToHtml(md: string): string {
   return out.join("\n");
 }
 
+type Segment =
+  | { type: "markdown"; content: string }
+  | { type: "mermaid"; content: string };
+
+/** Split markdown into prose segments and ```mermaid``` fences. */
+export function splitMarkdownSegments(md: string): Segment[] {
+  const segments: Segment[] = [];
+  const fenceRe = /```(\w*)\n([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = fenceRe.exec(md)) !== null) {
+    const [full, lang, body] = match;
+    if (match.index > lastIndex) {
+      segments.push({ type: "markdown", content: md.slice(lastIndex, match.index) });
+    }
+    if (lang.trim().toLowerCase() === "mermaid") {
+      segments.push({ type: "mermaid", content: body.trim() });
+    } else {
+      segments.push({ type: "markdown", content: full });
+    }
+    lastIndex = match.index + full.length;
+  }
+
+  if (lastIndex < md.length) {
+    segments.push({ type: "markdown", content: md.slice(lastIndex) });
+  }
+
+  return segments.length ? segments : [{ type: "markdown", content: md }];
+}
+
 export function Markdown({ content }: { content: string }) {
+  const segments = splitMarkdownSegments(content);
+
   return (
-    <div
-      className="prose-nova text-[0.95rem] text-zinc-200"
-      dangerouslySetInnerHTML={{ __html: markdownToHtml(content) }}
-    />
+    <div className="prose-nova space-y-3 text-[0.95rem] text-zinc-200">
+      {segments.map((segment, i) =>
+        segment.type === "mermaid" ? (
+          <MermaidDiagram key={`m-${i}`} chart={segment.content} />
+        ) : (
+          <div
+            key={`t-${i}`}
+            dangerouslySetInnerHTML={{ __html: markdownToHtml(segment.content) }}
+          />
+        ),
+      )}
+    </div>
   );
 }

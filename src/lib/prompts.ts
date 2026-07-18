@@ -1,5 +1,5 @@
 /**
- * System prompts + mock outputs for each Project Nova capability.
+ * System prompts for each Project Nova capability.
  * Keeping them here lets teammates tune a module's behaviour in one place.
  */
 
@@ -18,24 +18,6 @@ Rules for every finding:
 - State the location (line number or the smallest identifying snippet), the concrete problem, and a specific suggested fix — ideally with a short corrected code snippet.
 - Do not invent issues. If a section has no findings, write "None found".
 - End with a one-line overall risk verdict: Ship / Ship with fixes / Do not ship.`,
-  mock: `## Summary
-Reviewed the snippet in **mock mode** (no API key set). Overall structure is reasonable but there are a few correctness and security concerns.
-
-## Bugs & Correctness
-- [high] Missing input validation before use — guard against \`null\`/\`undefined\` at the entry point.
-- [medium] Off-by-one risk in the loop bound; verify the terminal condition.
-
-## Security Issues
-- [critical] User input appears to be interpolated directly into a query/command — use parameterized queries to prevent injection.
-- [low] Errors are swallowed; log with context so failures are observable.
-
-## Performance
-- [low] Repeated work inside the loop could be hoisted out.
-
-## Style & Maintainability
-- Extract the nested logic into a named helper for readability.
-
-> Set \`ANTHROPIC_API_KEY\` to get a real, code-specific review.`,
 };
 
 export const testsPrompt = {
@@ -44,29 +26,6 @@ Rules:
 - Detect the language/framework from the code and use the idiomatic test framework (e.g. Jest/Vitest for JS/TS, pytest for Python, JUnit for Java).
 - Cover happy paths, edge cases, and error handling.
 - Return ONLY a single fenced code block containing the tests, preceded by one short sentence naming the framework used.`,
-  mock: `Using **Jest** (mock mode — no API key set):
-
-\`\`\`ts
-import { describe, it, expect } from "@jest/globals";
-import { subject } from "./subject";
-
-describe("subject", () => {
-  it("handles the happy path", () => {
-    expect(subject(2, 3)).toBe(5);
-  });
-
-  it("handles zero", () => {
-    expect(subject(0, 0)).toBe(0);
-  });
-
-  it("throws on invalid input", () => {
-    // @ts-expect-error testing runtime guard
-    expect(() => subject(null, 3)).toThrow();
-  });
-});
-\`\`\`
-
-> Set \`ANTHROPIC_API_KEY\` to generate tests tailored to your actual code.`,
 };
 
 export const docsPrompt = {
@@ -77,29 +36,6 @@ Include:
 ## API Reference (functions/endpoints, parameters, return values)
 ## Examples (with fenced code blocks)
 Be accurate and concise. If it is an HTTP API, document method, path, request/response shapes.`,
-  mock: `## Overview
-Auto-generated documentation (**mock mode** — no API key set). This module exposes a small, focused API.
-
-## Usage
-\`\`\`ts
-import { subject } from "./subject";
-const result = subject(2, 3); // 5
-\`\`\`
-
-## API Reference
-### \`subject(a: number, b: number): number\`
-- **a** — first operand.
-- **b** — second operand.
-- **returns** — the sum of \`a\` and \`b\`.
-- **throws** — \`TypeError\` if either argument is not a number.
-
-## Examples
-\`\`\`ts
-subject(10, 5);  // 15
-subject(-1, 1);  // 0
-\`\`\`
-
-> Set \`ANTHROPIC_API_KEY\` to generate documentation from your real code.`,
 };
 
 export const ragPrompt = {
@@ -120,37 +56,17 @@ Include:
 ## API Surface (key endpoints)
 ## Tech Stack Recommendation (with brief rationale)
 ## Risks & Open Questions
-Add a Mermaid diagram in a \`\`\`mermaid\`\`\` block for the architecture. Keep it hackathon-pragmatic.`,
-  mock: `## Restated Requirements
-**Functional:** users submit requirements; system returns a design. **Non-functional:** fast, secure, role-based access.
 
-## Proposed Architecture
-A web client talks to an API gateway, which routes to stateless services backed by a database and an LLM provider.
+Add exactly one Mermaid diagram in a \`\`\`mermaid\`\`\` block for the architecture.
 
-\`\`\`mermaid
-flowchart LR
-  U[User] --> W[Web App]
-  W --> API[API Layer]
-  API --> DB[(Database)]
-  API --> LLM[LLM Provider]
-  API --> VDB[(Vector Store)]
-\`\`\`
+Mermaid rules (strict — invalid diagrams break the UI):
+- Prefer a flowchart: start with \`flowchart LR\` or \`flowchart TB\`.
+- Flowchart edges use \`-->\` only (example: \`Web[Web App] --> API[API Gateway]\`).
+- If you use a sequence diagram, start with \`sequenceDiagram\` (NOT flowchart/graph).
+- Sequence lines use \`ParticipantA->>ParticipantB: message\` and \`participant Id as Label\`.
+- Never mix types (do not put \`participant\` or \`->>\` inside a flowchart/graph).
+- Keep node IDs alphanumeric; put spaces only inside [brackets] or after \`as\`.
+- Keep the diagram small (about 6–12 nodes).
 
-## Data Model
-- **User**(id, name, role)
-- **Project**(id, name, ownerId)
-- **Artifact**(id, projectId, type, content)
-
-## API Surface
-- \`POST /api/design\` — generate a system design.
-- \`GET /api/projects/:id\` — fetch project artifacts.
-
-## Tech Stack Recommendation
-Next.js + TypeScript for one-codebase velocity; PostgreSQL for relational data; a managed vector store for RAG; Claude for generation.
-
-## Risks & Open Questions
-- Scope creep across the SDLC — pick one hero flow for the demo.
-- LLM latency/cost — cache and stream responses.
-
-> Set \`ANTHROPIC_API_KEY\` to generate a design specific to your requirements.`,
+When the user asks for a refinement, return a complete updated design document (not a diff), adjusting the Mermaid diagram when architecture changes.`,
 };
