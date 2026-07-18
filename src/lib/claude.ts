@@ -191,11 +191,7 @@ export async function* completeStream(
       temperature,
       max_tokens: maxTokens,
       stream: true,
-      messages: [
-        { role: "system", content: opts.system },
-        ...prior.map((m) => ({ role: m.role, content: m.content })),
-        { role: "user", content: opts.user },
-      ],
+      messages: groqMessages(opts.system, opts.user, prior),
     }),
   });
 
@@ -235,6 +231,20 @@ export async function* completeStream(
   }
 }
 
+/** Build OpenAI-style messages; never omit `content` (Groq rejects that). */
+function groqMessages(system: string, user: string, history: ChatMessage[]) {
+  const messages: { role: "system" | "user" | "assistant"; content: string }[] = [];
+  const sys = (system ?? "").trim();
+  if (sys) messages.push({ role: "system", content: sys });
+  for (const m of history) {
+    const content = (m.content ?? "").trim();
+    if (!content) continue;
+    messages.push({ role: m.role, content });
+  }
+  messages.push({ role: "user", content: (user ?? "").trim() || "(empty)" });
+  return messages;
+}
+
 async function completeWithGroq(opts: {
   system: string;
   user: string;
@@ -252,11 +262,7 @@ async function completeWithGroq(opts: {
       model: GROQ_MODEL,
       temperature: opts.temperature,
       max_tokens: opts.maxTokens,
-      messages: [
-        { role: "system", content: opts.system },
-        ...opts.history.map((m) => ({ role: m.role, content: m.content })),
-        { role: "user", content: opts.user },
-      ],
+      messages: groqMessages(opts.system, opts.user, opts.history),
     }),
   });
 

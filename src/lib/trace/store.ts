@@ -141,7 +141,7 @@ interface AddArtifactInput {
   title: string;
   content: string;
   parentId: string;
-  mode: "live" | "mock" | "manual";
+  mode: "live" | "free" | "manual";
 }
 
 /** Attach a generated artifact to a parent, snapshotting the parent's hash. */
@@ -194,7 +194,7 @@ export async function regenerateArtifact(
   projectId: string,
   artifactId: string,
   content: string,
-  mode: "live" | "mock" | "manual",
+  mode: "live" | "free" | "manual",
 ): Promise<TraceGraph> {
   const project = await getProject(projectId);
   if (!project) throw new Error(`Project not found: ${projectId}`);

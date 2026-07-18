@@ -34,19 +34,19 @@ single feature — it's four things a per-file IDE assistant structurally doesn'
 
 ### Nova vs other AI platforms (summary)
 
-| Capability | Nova | Copilot | Cursor | Cody | ChatGPT / Claude |
-| ---------- | :--: | :-----: | :----: | :--: | :--------------: |
-| Repo RAG chat + citations | Yes | Partial | Yes | Yes | Partial |
-| Grounded review / tests / docs / design | Yes | — | Partial | Partial | — |
-| Requirements → architecture design | Yes | — | Partial | — | Partial |
-| Artifact traceability graph | **Yes** | — | — | — | — |
-| Drift / staleness detection | **Yes** | — | — | — | — |
-| Team standards + RBAC (product focus) | **Yes** | Org IAM | Org IAM | Org IAM | — |
-| Local embeddings / self-host web app | **Yes** | — | — | Enterprise | — |
-| Inline IDE autocomplete | —* | **Yes** | **Yes** | Partial | — |
+| Capability | Nova | Copilot | Cursor | Claude Code | Cody | ChatGPT / Claude |
+| ---------- | :--: | :-----: | :----: | :---------: | :--: | :--------------: |
+| Repo RAG / repo-aware Q&A | Yes | Partial | Yes | Yes | Yes | Partial |
+| Grounded review / tests / docs / design | Yes | — | Partial | Partial | Partial | — |
+| Requirements → architecture design | Yes | — | Partial | Partial | — | Partial |
+| Artifact traceability graph | **Yes** | — | — | — | — | — |
+| Drift / staleness detection | **Yes** | — | — | — | — | — |
+| Team standards + RBAC (product focus) | **Yes** | Org IAM | Org IAM | Partial | Org IAM | — |
+| Local embeddings / self-host web app | **Yes** | — | — | — | Enterprise | — |
+| Agentic code edits (IDE/CLI) | —* | Partial | **Yes** | **Yes** | Partial | — |
 
-\*By design — Nova is a **lifecycle web platform**, not an IDE autocomplete plugin.  
-Full breakdown and objection handling → [USP.md](USP.md).
+\*By design — Nova is a **lifecycle web platform**, not an IDE/CLI coding agent.  
+Claude Code = implement changes; Nova = govern + trace the lifecycle. Full table → [USP.md](USP.md).
 
 ---
 

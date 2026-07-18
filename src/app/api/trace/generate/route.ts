@@ -33,22 +33,32 @@ export async function POST(req: Request) {
     // Nova uses, so traceability artifacts reflect how the project really works.
     const { context } = await getProjectContext(project.indexId, parent.content);
 
+    const system = (spec.system ?? "").trim();
+    if (!system) {
+      return NextResponse.json(
+        { error: `No system prompt configured for '${targetKind}'.` },
+        { status: 500 },
+      );
+    }
+
     const result = await complete({
-      system: spec.system,
+      system,
       user: withProjectContext(context, spec.instruction(parent.kind, parent.content)),
-      mock: spec.mock,
       maxTokens: spec.maxTokens,
     });
 
+    // Map LLM mode ("live" | "free") onto the artifact mode union.
+    const mode = result.mode === "free" ? "free" : "live";
+
     // Regenerate in place (clears staleness) or create a fresh linked artifact.
     const graph = replaceArtifactId
-      ? await regenerateArtifact(projectId, String(replaceArtifactId), result.text, result.mode)
+      ? await regenerateArtifact(projectId, String(replaceArtifactId), result.text, mode)
       : await addArtifact(projectId, {
           kind: targetKind as ArtifactKind,
           title: spec.title,
           content: result.text,
           parentId,
-          mode: result.mode,
+          mode,
         });
 
     return NextResponse.json(graph);
