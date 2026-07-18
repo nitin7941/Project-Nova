@@ -53,37 +53,29 @@ Browser ──> Next.js page ──> /api/<feature> route ──> lib/claude.ts 
 
 ---
 
-## 👥 Team assignments (hackathon next steps)
+## 👥 Team assignments — 3 members
 
-The scaffold is live and each feature is isolated — grab a module and go deep.
+The scaffold is live and every module is isolated, so we can work in parallel.
+Each stream has its own branch (already pushed). Work on your branch, open a PR into `main`.
 
-### Teammate A — 🔍 Code Review (`/review`)
-- [ ] Tune `reviewPrompt` in `src/lib/prompts.ts` for sharper severity tagging.
-- [ ] Add **file upload / paste-a-diff** support.
-- [ ] Stretch: fetch a file directly from a GitHub URL and review it.
+### 👤 Member 1 — Nitin (Lead · Code Review + Platform)
+**Branches:** `feat/review`, `feat/rag`
+- [ ] 🔍 **Code Review** (`/review`): tune `reviewPrompt`, add paste-a-diff, review a file from a GitHub URL.
+- [ ] 🧠 **RAG "chat with your codebase"** (`feat/rag`) — the biggest differentiator: index a repo, vector search, context-aware answers.
+- [ ] Platform glue: auth + role-based access, response streaming, deployment.
 
-### Teammate B — 🧪 Test Generator (`/tests`)
-- [ ] Add a **framework selector** (Jest / Vitest / pytest / JUnit).
-- [ ] Add a "copy tests" button and a downloadable `.test` file.
-- [ ] Stretch: run generated tests in a sandbox and show pass/fail.
+### 👤 Member 2 — Quality & Docs
+**Branches:** `feat/tests`, `feat/docs`
+- [ ] 🧪 **Test Generator** (`/tests`): framework selector (Jest / Vitest / pytest / JUnit), copy + download tests, stretch: run tests in a sandbox.
+- [ ] 📚 **Docs Generator** (`/docs`): OpenAPI/Swagger output for HTTP APIs, Markdown export/copy button.
 
-### Teammate C — 📚 Docs Generator (`/docs`)
-- [ ] Support **OpenAPI/Swagger** output for HTTP APIs.
-- [ ] Add Markdown export / "copy" button.
-- [ ] Stretch: render Mermaid diagrams inline.
+### 👤 Member 3 — Design & UX
+**Branches:** `feat/design`, `feat/ux`
+- [ ] 🏗️ **Requirements → Design** (`/design`): render the Mermaid diagram visually (add `mermaid` client-side), export to Markdown/PDF, stretch: multi-turn refinement.
+- [ ] 🎨 **UX polish** (`feat/ux`): dashboard/landing polish, loading/streaming states, run history, mobile nav.
 
-### Teammate D — 🏗️ Requirements → Design (`/design`)
-- [ ] Render the Mermaid diagram visually (add `mermaid` client-side).
-- [ ] Add export to Markdown / PDF.
-- [ ] Stretch: multi-turn refinement ("make it cheaper", "add caching").
-
-### Shared / platform (anyone)
-- [ ] **RAG over a Git repo** (the "chat with your codebase" flow) — the biggest differentiator.
-- [ ] Auth + role-based access (the "secure web app" requirement).
-- [ ] Response **streaming** for snappier UX.
-- [ ] Persist runs to a database (history per project).
-
-> **Convention:** one feature per branch (`feat/review`, `feat/tests`, …), open a PR into `main`. Keep prompts in `lib/prompts.ts` and UI reuse in `FeatureWorkbench`.
+> **Convention:** work on your feature branch, keep prompts in `src/lib/prompts.ts`,
+> reuse UI via `FeatureWorkbench`, then open a PR into `main`. Rebase on `main` often.
 
 ---
 
