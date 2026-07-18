@@ -52,3 +52,33 @@ export async function complete(opts: CompletionOptions): Promise<CompletionResul
 
   return { text, mode: "live", model: DEFAULT_MODEL };
 }
+
+/**
+ * Streaming variant of {@link complete}. Yields text deltas as they arrive.
+ * In mock mode it chunks the mock output so the UI still streams.
+ */
+export async function* completeStream(
+  opts: CompletionOptions,
+): AsyncGenerator<string, void, unknown> {
+  if (!isLiveMode) {
+    for (const word of opts.mock.match(/\S+\s*/g) ?? [opts.mock]) {
+      yield word;
+      await new Promise((r) => setTimeout(r, 12));
+    }
+    return;
+  }
+
+  const stream = getClient().messages.stream({
+    model: DEFAULT_MODEL,
+    max_tokens: opts.maxTokens ?? 2048,
+    temperature: opts.temperature ?? 0.2,
+    system: opts.system,
+    messages: [{ role: "user", content: opts.user }],
+  });
+
+  for await (const event of stream) {
+    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      yield event.delta.text;
+    }
+  }
+}

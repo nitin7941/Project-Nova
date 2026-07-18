@@ -11,9 +11,24 @@ export interface Feature {
   cta: string;
   /** Owner column so hackathon teammates can claim a module. */
   owner: string;
+  /** Show a "load a file from a GitHub URL" input in the workbench. */
+  supportsGithubUrl?: boolean;
 }
 
 export const features: Feature[] = [
+  {
+    slug: "chat",
+    href: "/chat",
+    api: "/api/rag/chat",
+    name: "Chat with your Codebase",
+    tagline: "Index a Git repo or folder and ask questions grounded in the real code.",
+    icon: "🧠",
+    accent: "from-violet-500 to-fuchsia-600",
+    inputLabel: "Ask about the codebase",
+    placeholder: "How does authentication work?",
+    cta: "Ask Nova",
+    owner: "Nitin",
+  },
   {
     slug: "review",
     href: "/review",
@@ -25,7 +40,8 @@ export const features: Feature[] = [
     inputLabel: "Paste code to review",
     placeholder: "// Paste a function, file, or diff here...",
     cta: "Review code",
-    owner: "Teammate A",
+    owner: "Nitin",
+    supportsGithubUrl: true,
   },
   {
     slug: "tests",
@@ -38,7 +54,7 @@ export const features: Feature[] = [
     inputLabel: "Paste code to test",
     placeholder: "# Paste the code you want tests for...",
     cta: "Generate tests",
-    owner: "Teammate B",
+    owner: "Vishal",
   },
   {
     slug: "docs",
@@ -51,7 +67,7 @@ export const features: Feature[] = [
     inputLabel: "Paste code or API to document",
     placeholder: "// Paste code, a module, or an API handler...",
     cta: "Generate docs",
-    owner: "Teammate C",
+    owner: "Vishal",
   },
   {
     slug: "design",
@@ -64,7 +80,7 @@ export const features: Feature[] = [
     inputLabel: "Describe the requirements",
     placeholder: "We need a platform that lets teams...",
     cta: "Design system",
-    owner: "Teammate D",
+    owner: "Sahil",
   },
 ];
 
