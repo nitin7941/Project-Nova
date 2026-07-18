@@ -142,26 +142,33 @@ export function DesignWorkbench({ feature }: { feature: Feature }) {
           indexId: indexId || undefined,
         }),
       });
-      const data = await res.json();
+      const { readJson } = await import("@/lib/http");
+      const data = await readJson<{
+        error?: string;
+        text?: string;
+        mode?: "live" | "free";
+        sources?: { file: string; startLine: number; endLine: number; score: number }[];
+      }>(res);
       if (!res.ok) throw new Error(data.error || "Request failed");
+      const text = data.text ?? "";
 
       const nextHistory: ChatTurn[] =
         kind === "initial"
           ? [
               { role: "user", content: requirements },
-              { role: "assistant", content: data.text },
+              { role: "assistant", content: text },
             ]
           : [
               ...history,
               { role: "user", content: requirements },
-              { role: "assistant", content: data.text },
+              { role: "assistant", content: text },
             ];
 
       setHistory(nextHistory);
-      setOutput(data.text);
-      setMode(data.mode);
+      setOutput(text);
+      setMode(data.mode ?? null);
       setSources(data.sources ?? []);
-      recordRun(kind === "initial" ? requirements : input, data.text, data.mode);
+      recordRun(kind === "initial" ? requirements : input, text, data.mode);
       if (kind === "refine") setRefine("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
