@@ -29,3 +29,11 @@ next-env.d.ts
 
 # Project Nova RAG artifacts (cloned repos + vector indexes)
 /.nova/
+
+# Vercel
+.vercel
+
+# env files (keep .env.example tracked)
+.env
+.env*.local
+.env.vercel
