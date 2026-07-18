@@ -27,16 +27,19 @@ export async function POST(req: Request) {
     const { embed } = await import("@/lib/rag/embeddings");
     const vectors = await embed(chunks.map((c) => c.text));
 
-    const summary = await saveIndex({
+    const record = {
       id: randomUUID(),
       source: result.label,
       createdAt: Date.now(),
       fileCount: result.files.length,
       chunks,
       vectors,
-    });
+    };
+    const summary = await saveIndex(record);
 
-    return NextResponse.json(summary);
+    // Include the full record so the browser can rehydrate on the next
+    // serverless instance (Vercel /tmp is not shared).
+    return NextResponse.json({ ...summary, record });
   } catch (err) {
     console.error("[rag/index]", err);
     const message = err instanceof Error ? err.message : "Failed to index the codebase.";

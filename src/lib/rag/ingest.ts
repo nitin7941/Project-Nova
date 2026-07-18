@@ -44,6 +44,94 @@ function looksLikeGitUrl(s: string): boolean {
   return /^https?:\/\/.+/i.test(s.trim());
 }
 
+function parseGithubRepo(url: string): { owner: string; repo: string } | null {
+  try {
+    const u = new URL(url.trim());
+    if (!/^(www\.)?github\.com$/i.test(u.hostname)) return null;
+    const parts = u.pathname.split("/").filter(Boolean);
+    if (parts.length < 2) return null;
+    const owner = parts[0];
+    const repo = parts[1].replace(/\.git$/i, "");
+    if (!owner || !repo) return null;
+    return { owner, repo };
+  } catch {
+    return null;
+  }
+}
+
+async function gitAvailable(): Promise<boolean> {
+  try {
+    await exec("git", ["--version"], { timeout: 5_000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetch a public GitHub repo via the Trees + raw APIs (no local `git` binary).
+ * Used on Vercel where `spawn git` fails with ENOENT.
+ */
+async function ingestGithubApi(owner: string, repo: string, label: string): Promise<IngestResult> {
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "User-Agent": "project-nova",
+  };
+  if (process.env.GITHUB_TOKEN?.trim()) {
+    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN.trim()}`;
+  }
+
+  const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
+  if (!repoRes.ok) {
+    throw new Error(
+      `GitHub repo lookup failed (${repoRes.status}). Use a public github.com/owner/repo URL` +
+        (repoRes.status === 404 ? "." : ", or set GITHUB_TOKEN for private repos."),
+    );
+  }
+  const repoMeta = (await repoRes.json()) as { default_branch?: string };
+  const branch = repoMeta.default_branch || "main";
+
+  const treeRes = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+    { headers },
+  );
+  if (!treeRes.ok) {
+    throw new Error(`GitHub tree fetch failed (${treeRes.status}) for ${owner}/${repo}@${branch}.`);
+  }
+  const treeJson = (await treeRes.json()) as {
+    tree?: { path: string; type: string; size?: number }[];
+    truncated?: boolean;
+  };
+
+  const blobs = (treeJson.tree ?? []).filter((t) => {
+    if (t.type !== "blob") return false;
+    if ((t.size ?? 0) === 0 || (t.size ?? 0) > MAX_FILE_BYTES) return false;
+    const base = path.basename(t.path);
+    if (IGNORE_FILES.has(base)) return false;
+    const segments = t.path.split("/");
+    if (segments.some((s) => IGNORE_DIRS.has(s))) return false;
+    const ext = path.extname(base).toLowerCase();
+    return ALLOWED_EXT.has(ext) || base.endsWith(".example");
+  });
+
+  const files: IngestedFile[] = [];
+  for (const blob of blobs) {
+    if (files.length >= MAX_FILES) break;
+    const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${blob.path}`;
+    const res = await fetch(rawUrl, { headers: { "User-Agent": "project-nova" } });
+    if (!res.ok) continue;
+    const content = await res.text();
+    if (!content || content.includes("\u0000")) continue;
+    files.push({ relPath: blob.path, content });
+  }
+
+  if (files.length === 0) {
+    throw new Error("No indexable source files were found in that GitHub repository.");
+  }
+
+  return { label, files };
+}
+
 async function resolveRoot(source: string): Promise<{ root: string; label: string; cleanup?: () => Promise<void> }> {
   const trimmed = source.trim();
 
@@ -52,13 +140,24 @@ async function resolveRoot(source: string): Promise<{ root: string; label: strin
     const dir = path.join(os.tmpdir(), "nova-repos", hash);
     await fs.rm(dir, { recursive: true, force: true });
     await fs.mkdir(path.dirname(dir), { recursive: true });
-    // execFile (not a shell) so the URL cannot inject shell commands.
-    await exec("git", ["clone", "--depth", "1", trimmed, dir], { timeout: 120_000 });
-    return {
-      root: dir,
-      label: trimmed,
-      cleanup: () => fs.rm(dir, { recursive: true, force: true }),
-    };
+
+    if (await gitAvailable()) {
+      await exec("git", ["clone", "--depth", "1", trimmed, dir], { timeout: 120_000 });
+      return {
+        root: dir,
+        label: trimmed,
+        cleanup: () => fs.rm(dir, { recursive: true, force: true }),
+      };
+    }
+
+    // No git binary (typical on Vercel) — caller will use GitHub API path instead.
+    throw new Error("NO_GIT");
+  }
+
+  if (process.env.VERCEL) {
+    throw new Error(
+      "Local folder paths cannot be indexed on Vercel. Use a public GitHub URL (https://github.com/owner/repo).",
+    );
   }
 
   const abs = path.resolve(trimmed);
@@ -88,7 +187,7 @@ async function walk(root: string): Promise<IngestedFile[]> {
         const stat = await fs.stat(full);
         if (stat.size > MAX_FILE_BYTES || stat.size === 0) continue;
         const content = await fs.readFile(full, "utf8").catch(() => null);
-        if (content === null || content.includes("\u0000")) continue; // skip binaries
+        if (content === null || content.includes("\u0000")) continue;
         files.push({ relPath: path.relative(root, full), content });
       }
     }
@@ -98,17 +197,34 @@ async function walk(root: string): Promise<IngestedFile[]> {
   return files;
 }
 
-/** Clone (Git URL) or read (local path) a codebase into an in-memory file list. */
+/** Clone (Git URL), fetch (GitHub API on serverless), or read (local path). */
 export async function ingest(source: string): Promise<IngestResult> {
-  const { root, label, cleanup } = await resolveRoot(source);
+  const trimmed = source.trim();
+  const gh = looksLikeGitUrl(trimmed) ? parseGithubRepo(trimmed) : null;
+
   try {
-    const files = await walk(root);
-    if (files.length === 0) {
-      throw new Error("No indexable source files were found.");
+    const { root, label, cleanup } = await resolveRoot(source);
+    try {
+      const files = await walk(root);
+      if (files.length === 0) {
+        throw new Error("No indexable source files were found.");
+      }
+      return { label, files, cleanup };
+    } catch (err) {
+      if (cleanup) await cleanup().catch(() => {});
+      throw err;
     }
-    return { label, files, cleanup };
   } catch (err) {
-    if (cleanup) await cleanup().catch(() => {});
+    const msg = err instanceof Error ? err.message : String(err);
+    // Prefer GitHub HTTP ingest when git is missing or spawn fails (ENOENT).
+    if (gh && (msg === "NO_GIT" || /ENOENT|spawn git/i.test(msg))) {
+      return ingestGithubApi(gh.owner, gh.repo, trimmed);
+    }
+    if (/ENOENT|spawn git/i.test(msg)) {
+      throw new Error(
+        "git is not available in this environment. Use a public https://github.com/owner/repo URL.",
+      );
+    }
     throw err;
   }
 }

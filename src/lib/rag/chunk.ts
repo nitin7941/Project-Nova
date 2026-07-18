@@ -4,7 +4,8 @@ import type { IngestedFile } from "./ingest";
 
 const CHUNK_LINES = 60;
 const OVERLAP_LINES = 10;
-export const MAX_CHUNKS = 3000;
+/** Cap lower on Vercel so client can rehydrate the index across serverless instances. */
+export const MAX_CHUNKS = process.env.VERCEL ? 150 : 3000;
 
 /** Split a single file into overlapping line windows. */
 export function chunkFile(file: IngestedFile): Chunk[] {

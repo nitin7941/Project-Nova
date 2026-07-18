@@ -1,10 +1,9 @@
 /**
- * Local embeddings via transformers.js.
+ * Embeddings for RAG.
  *
- * IMPORTANT: do not statically import `@huggingface/transformers` — on Vercel
- * serverless the native ONNX runtime (`libonnxruntime.so.1`) is unavailable and
- * a top-level import crashes every API route that pulls this module in.
- * We dynamic-import only when embeddings are actually needed (local/dev RAG).
+ * Prefer transformers.js (MiniLM) when the ONNX runtime is available (local Node).
+ * On Vercel serverless, fall back to a deterministic hashed bag-of-words vector so
+ * indexing/chat still work without libonnxruntime.so.1.
  */
 
 export const EMBEDDING_DIM = 384;
@@ -16,32 +15,51 @@ type FeatureExtractionPipeline = (
   opts: { pooling: "mean"; normalize: boolean },
 ) => Promise<{ tolist: () => number[][] }>;
 
-let extractorPromise: Promise<FeatureExtractionPipeline> | null = null;
-let unavailableReason: string | null = null;
+let extractorPromise: Promise<FeatureExtractionPipeline | null> | null = null;
+let useHashFallback = false;
 
-/** True when the ONNX embedding runtime can be loaded in this environment. */
-export function embeddingsUnavailableReason(): string | null {
-  return unavailableReason;
+function normalize(vec: number[]): number[] {
+  let sum = 0;
+  for (const v of vec) sum += v * v;
+  const norm = Math.sqrt(sum) || 1;
+  return vec.map((v) => v / norm);
 }
 
-async function getExtractor(): Promise<FeatureExtractionPipeline> {
-  if (unavailableReason) {
-    throw new Error(unavailableReason);
+/** Lightweight embedding used when ONNX/transformers cannot load. */
+export function hashEmbed(text: string, dim = EMBEDDING_DIM): number[] {
+  const vec = new Array(dim).fill(0);
+  const tokens = text.toLowerCase().split(/[^a-z0-9_./+-]+/).filter((t) => t.length > 1);
+  for (const token of tokens) {
+    let h = 2166136261;
+    for (let i = 0; i < token.length; i++) {
+      h ^= token.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    const idx = Math.abs(h) % dim;
+    vec[idx] += 1;
+    // Bigram bump for a bit more signal
+    if (token.length > 3) {
+      const idx2 = Math.abs(h >>> 8) % dim;
+      vec[idx2] += 0.5;
+    }
   }
+  return normalize(vec);
+}
+
+async function getExtractor(): Promise<FeatureExtractionPipeline | null> {
+  if (useHashFallback) return null;
   if (!extractorPromise) {
     extractorPromise = (async () => {
       try {
         const mod = await import("@huggingface/transformers");
         return (await mod.pipeline("feature-extraction", MODEL)) as unknown as FeatureExtractionPipeline;
       } catch (err) {
-        const detail = err instanceof Error ? err.message : String(err);
-        unavailableReason =
-          "Local embeddings are unavailable in this environment " +
-          "(ONNX runtime missing — typical on Vercel serverless). " +
-          "Run Nova locally for RAG indexing/chat, or use features without project context. " +
-          `Details: ${detail.slice(0, 160)}`;
-        extractorPromise = null;
-        throw new Error(unavailableReason);
+        useHashFallback = true;
+        console.warn(
+          "[embeddings] transformers/ONNX unavailable — using hash fallback.",
+          err instanceof Error ? err.message : err,
+        );
+        return null;
       }
     })();
   }
@@ -52,14 +70,16 @@ async function getExtractor(): Promise<FeatureExtractionPipeline> {
 export async function embed(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
   const extractor = await getExtractor();
-  const vectors: number[][] = [];
+  if (!extractor) {
+    return texts.map((t) => hashEmbed(t));
+  }
 
+  const vectors: number[][] = [];
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
     const batch = texts.slice(i, i + BATCH_SIZE);
     const output = await extractor(batch, { pooling: "mean", normalize: true });
     vectors.push(...(output.tolist() as number[][]));
   }
-
   return vectors;
 }
 

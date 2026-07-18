@@ -27,8 +27,13 @@ function projectPath(id: string): string {
 async function persist(project: TraceProject): Promise<void> {
   project.updatedAt = Date.now();
   cache.set(project.id, project);
-  await fs.mkdir(PROJECT_DIR, { recursive: true });
-  await fs.writeFile(projectPath(project.id), JSON.stringify(project, null, 2));
+  try {
+    await fs.mkdir(PROJECT_DIR, { recursive: true });
+    await fs.writeFile(projectPath(project.id), JSON.stringify(project, null, 2));
+  } catch (err) {
+    // On multi-instance serverless, disk is best-effort; clients also keep a snapshot.
+    console.warn("[trace/store] disk persist skipped:", err instanceof Error ? err.message : err);
+  }
 }
 
 export async function getProject(id: string): Promise<TraceProject | null> {
@@ -42,6 +47,46 @@ export async function getProject(id: string): Promise<TraceProject | null> {
   } catch {
     return null;
   }
+}
+
+/** Rehydrate a project from a client snapshot (needed on Vercel when /tmp isn't shared). */
+export async function ensureProject(snapshot: TraceProject | TraceGraph): Promise<TraceProject> {
+  const existing = await getProject(snapshot.id);
+  if (existing) {
+    // Prefer newer client snapshot when it has more artifacts / later update.
+    const incomingArts =
+      "artifacts" in snapshot ? snapshot.artifacts.length : 0;
+    if (incomingArts >= existing.artifacts.length && snapshot.updatedAt >= existing.updatedAt) {
+      const project = stripGraph(snapshot);
+      await persist(project);
+      return project;
+    }
+    return existing;
+  }
+  const project = stripGraph(snapshot);
+  await persist(project);
+  return project;
+}
+
+function stripGraph(snapshot: TraceProject | TraceGraph): TraceProject {
+  return {
+    id: snapshot.id,
+    name: snapshot.name,
+    indexId: snapshot.indexId ?? null,
+    createdAt: snapshot.createdAt,
+    updatedAt: snapshot.updatedAt,
+    artifacts: snapshot.artifacts.map((a) => ({
+      id: a.id,
+      kind: a.kind,
+      title: a.title,
+      content: a.content,
+      createdAt: a.createdAt,
+      updatedAt: a.updatedAt,
+      parentId: a.parentId,
+      parentHash: a.parentHash,
+      mode: a.mode,
+    })),
+  };
 }
 
 function findArtifact(project: TraceProject, artifactId: string): Artifact | undefined {

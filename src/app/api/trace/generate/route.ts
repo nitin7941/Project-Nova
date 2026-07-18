@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { complete } from "@/lib/claude";
 import { getProjectContext, withProjectContext } from "@/lib/rag/context";
-import { addArtifact, getProject, regenerateArtifact } from "@/lib/trace/store";
+import { addArtifact, ensureProject, getProject, regenerateArtifact } from "@/lib/trace/store";
 import { GEN } from "@/lib/trace/generate";
-import type { ArtifactKind } from "@/lib/trace/types";
+import type { ArtifactKind, TraceGraph, TraceProject } from "@/lib/trace/types";
 
 export const maxDuration = 120;
 
 export async function POST(req: Request) {
   try {
-    const { projectId, parentId, targetKind, replaceArtifactId } = await req.json();
+    const { projectId, parentId, targetKind, replaceArtifactId, snapshot } = await req.json();
 
     if (!projectId || !parentId || !targetKind) {
       return NextResponse.json(
@@ -21,6 +21,11 @@ export async function POST(req: Request) {
     const spec = GEN[targetKind as Exclude<ArtifactKind, "requirement">];
     if (!spec) {
       return NextResponse.json({ error: `Cannot generate a '${targetKind}'.` }, { status: 400 });
+    }
+
+    // Vercel instances don't share /tmp — accept a client snapshot to rehydrate.
+    if (snapshot && typeof snapshot === "object" && snapshot.id === projectId) {
+      await ensureProject(snapshot as TraceProject | TraceGraph);
     }
 
     const project = await getProject(projectId);

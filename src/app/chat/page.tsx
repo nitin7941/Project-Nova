@@ -17,6 +17,12 @@ interface IndexSummary {
   chunkCount: number;
 }
 
+interface IndexRecord extends IndexSummary {
+  createdAt: number;
+  chunks: { id: string; file: string; startLine: number; endLine: number; text: string }[];
+  vectors: number[][];
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
@@ -28,6 +34,7 @@ export default function ChatPage() {
   const [source, setSource] = useState("");
   const [indexing, setIndexing] = useState(false);
   const [index, setIndex] = useState<IndexSummary | null>(null);
+  const [indexRecord, setIndexRecord] = useState<IndexRecord | null>(null);
   const [error, setError] = useState("");
 
   const [question, setQuestion] = useState("");
@@ -37,12 +44,13 @@ export default function ChatPage() {
 
   async function indexRepo() {
     if (!source.trim()) {
-      setError("Enter a Git URL or a local folder path.");
+      setError("Enter a public GitHub URL (required on Vercel) or a local folder path.");
       return;
     }
     setIndexing(true);
     setError("");
     setIndex(null);
+    setIndexRecord(null);
     setMessages([]);
     try {
       const res = await fetch("/api/rag/index", {
@@ -52,7 +60,13 @@ export default function ChatPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Indexing failed");
-      setIndex(data);
+      setIndex({
+        id: data.id,
+        source: data.source,
+        fileCount: data.fileCount,
+        chunkCount: data.chunkCount,
+      });
+      if (data.record) setIndexRecord(data.record as IndexRecord);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Indexing failed.");
     } finally {
@@ -74,7 +88,11 @@ export default function ChatPage() {
       const res = await fetch("/api/rag/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ indexId: index.id, question: q }),
+        body: JSON.stringify({
+          indexId: index.id,
+          question: q,
+          snapshot: indexRecord ?? undefined,
+        }),
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
@@ -150,14 +168,14 @@ export default function ChatPage() {
       {/* Step 1: index */}
       <section className="rounded-2xl border border-white/10 bg-[#12121b] p-4">
         <label className="mb-2 block text-sm font-medium text-zinc-300">
-          1. Index a codebase — Git URL or local folder path
+          1. Index a codebase — public GitHub URL (Vercel) or local folder (local dev)
         </label>
         <div className="flex flex-col gap-3 sm:flex-row">
           <input
             value={source}
             onChange={(e) => setSource(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !indexing && indexRepo()}
-            placeholder="https://github.com/owner/repo.git  or  /var/www/html/5.0/project-nova"
+            placeholder="https://github.com/owner/repo"
             className="flex-1 rounded-xl border border-white/10 bg-[#0d0d15] px-3 py-2 text-sm text-zinc-100 outline-none focus:border-violet-500/60"
           />
           <button

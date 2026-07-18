@@ -2,6 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { Markdown } from "@/components/Markdown";
+import {
+  getTraceGraph,
+  listTraceSummaries,
+  saveTraceGraph,
+} from "@/lib/trace/clientStore";
 import { ARTIFACT_KINDS, DOWNSTREAM } from "@/lib/trace/types";
 import type { ArtifactKind, ArtifactView, TraceGraph } from "@/lib/trace/types";
 
@@ -58,15 +63,21 @@ export default function TracePage() {
   }, []);
 
   async function refreshProjects() {
+    // Prefer browser store on Vercel (server /tmp is not shared across instances).
+    const local = listTraceSummaries();
     try {
       const d = await fetch("/api/trace/project").then((r) => r.json());
-      setProjects(d.projects ?? []);
+      const remote = (d.projects ?? []) as ProjectSummary[];
+      const byId = new Map<string, ProjectSummary>();
+      for (const p of [...remote, ...local]) byId.set(p.id, p);
+      setProjects([...byId.values()].sort((a, b) => b.updatedAt - a.updatedAt));
     } catch {
-      setProjects([]);
+      setProjects(local);
     }
   }
 
   function applyGraph(g: TraceGraph) {
+    saveTraceGraph(g);
     setGraph(g);
     // Keep the detail panel in sync with the freshly returned graph.
     setSelected((prev) => (prev ? g.artifacts.find((a) => a.id === prev.id) ?? null : null));
@@ -77,10 +88,23 @@ export default function TracePage() {
     setSelected(null);
     try {
       const res = await fetch(`/api/trace/project/${id}`);
-      const g = await res.json();
-      if (!res.ok) throw new Error(g.error || "Could not load project");
-      setGraph(g);
+      if (res.ok) {
+        const g = (await res.json()) as TraceGraph;
+        applyGraph(g);
+        return;
+      }
+      const local = getTraceGraph(id);
+      if (local) {
+        applyGraph(local);
+        return;
+      }
+      throw new Error("Project not found. Create a new chain — serverless hosts don't keep old projects.");
     } catch (e) {
+      const local = getTraceGraph(id);
+      if (local) {
+        applyGraph(local);
+        return;
+      }
       setError(e instanceof Error ? e.message : "Could not load project.");
     }
   }
@@ -100,7 +124,7 @@ export default function TracePage() {
       });
       const g = await res.json();
       if (!res.ok) throw new Error(g.error || "Could not create project");
-      setGraph(g);
+      applyGraph(g as TraceGraph);
       setShowNew(false);
       setName("");
       setRequirement("");
@@ -121,7 +145,13 @@ export default function TracePage() {
       const res = await fetch("/api/trace/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: graph.id, parentId: parent.id, targetKind, replaceArtifactId }),
+        body: JSON.stringify({
+          projectId: graph.id,
+          parentId: parent.id,
+          targetKind,
+          replaceArtifactId,
+          snapshot: graph,
+        }),
       });
       const g = await res.json();
       if (!res.ok) throw new Error(g.error || "Generation failed");
@@ -141,7 +171,7 @@ export default function TracePage() {
       const res = await fetch(`/api/trace/project/${graph.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ artifactId, ...body }),
+        body: JSON.stringify({ artifactId, snapshot: graph, ...body }),
       });
       const g = await res.json();
       if (!res.ok) throw new Error(g.error || "Update failed");
