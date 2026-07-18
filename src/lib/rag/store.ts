@@ -1,15 +1,9 @@
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
+import { novaDataDir } from "@/lib/novaPaths";
 import type { IndexRecord, IndexSummary, RetrievedChunk } from "./types";
 
-// On serverless hosts (e.g. Vercel) the project dir is read-only; only the
-// system temp dir is writable. Allow an explicit override, else fall back to
-// a writable location so indexing doesn't crash in production.
-const INDEX_BASE =
-  process.env.NOVA_INDEX_DIR ||
-  (process.env.VERCEL ? path.join(os.tmpdir(), "nova") : path.join(process.cwd(), ".nova"));
-const INDEX_DIR = path.join(INDEX_BASE, "index");
+const INDEX_DIR = path.join(novaDataDir(), "index");
 
 // In-memory cache; disk is the source of truth so indexes survive dev restarts.
 const cache = new Map<string, IndexRecord>();

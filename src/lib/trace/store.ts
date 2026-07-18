@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { novaDataDir } from "@/lib/novaPaths";
 import type {
   Artifact,
   ArtifactKind,
@@ -10,7 +11,7 @@ import type {
   TraceProjectSummary,
 } from "./types";
 
-const PROJECT_DIR = path.join(process.cwd(), ".nova", "projects");
+const PROJECT_DIR = path.join(novaDataDir(), "projects");
 
 // In-memory cache; disk is the source of truth so projects survive restarts.
 const cache = new Map<string, TraceProject>();
