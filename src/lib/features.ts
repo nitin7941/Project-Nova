@@ -82,6 +82,19 @@ export const features: Feature[] = [
     cta: "Design system",
     owner: "Sahil",
   },
+  {
+    slug: "trace",
+    href: "/trace",
+    api: "/api/trace/project",
+    name: "Traceability & Drift",
+    tagline: "Link requirement → design → tests → docs, and flag what goes stale when upstream changes.",
+    icon: "🕸️",
+    accent: "from-rose-500 to-amber-600",
+    inputLabel: "Requirement to trace",
+    placeholder: "Users can reset their password via email.",
+    cta: "Trace it",
+    owner: "Nitin",
+  },
 ];
 
 export const featureBySlug = (slug: string) => features.find((f) => f.slug === slug);
