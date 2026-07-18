@@ -10,6 +10,33 @@ designs. Built with **Next.js + TypeScript** and powered by **Anthropic Claude**
 
 ---
 
+## ✨ Why Nova? (and how it's *not* just Copilot)
+
+Copilot and raw Claude make an **individual developer** faster at **writing a line of code**.
+Nova makes a **team** faster and safer across the **whole lifecycle**. The moat isn't any
+single feature — it's four things a per-file IDE assistant structurally doesn't do:
+
+1. **Grounded in *your* repo, everywhere.** Every feature — review, tests, docs, design —
+   can pull **project context** from an indexed codebase (RAG) and cite `file:line`. The AI
+   answers based on *how this project actually works*, not generic patterns. Pick a project
+   from the "Project context" dropdown in any tool.
+2. **A team platform, not a personal assistant.** Role-based access, one shared indexed
+   knowledge base, and **your standards enforced for everyone** (review checklist, security
+   rubric, and prompts live in `src/lib/prompts.ts` — change once, applies to the whole team).
+3. **Provenance & citations.** Grounded answers show the exact snippets used, so reviews and
+   designs are auditable — not an opaque black box.
+4. **Data control.** Embeddings run **locally** (no key, nothing leaves the box); only tiny
+   retrieved snippets reach the LLM; provider-agnostic and self-hostable.
+
+> **Pitch line:** *"We're not competing with autocomplete. Nova is the governance and
+> continuity layer on top of it — it remembers the project, links requirements to code to
+> tests to docs, enforces our standards, cites its sources, and keeps our code on our
+> infrastructure."*
+
+New to the codebase? Read [ONBOARDING.md](ONBOARDING.md).
+
+---
+
 ## 🚀 Quick start
 
 ```bash
