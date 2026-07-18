@@ -29,7 +29,7 @@ export const INPUT_METHODS = [
   {
     id: "github",
     label: "GitHub",
-    hint: "Load files from a GitHub repo and branch",
+    hint: "Load source from GitHub; requirements optional (GitHub path or local upload)",
     existingOnly: false,
   },
 ] as const;

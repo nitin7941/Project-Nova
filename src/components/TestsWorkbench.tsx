@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Markdown } from "@/components/Markdown";
 import type { Feature } from "@/lib/features";
 import { scanLocalProject, type ScannedProject } from "@/lib/localProject";
@@ -30,8 +30,22 @@ const labelClass = "mb-1 block text-[11px] font-medium uppercase tracking-wide t
 
 type ResultTab = "generated" | "validation";
 
+/** Matches main's LlmProviderId from @/lib/claude */
+type LlmProviderChoice = "auto" | "anthropic" | "groq";
+
+const LLM_CHOICES: {
+  id: LlmProviderChoice;
+  label: string;
+  hint: string;
+}[] = [
+  { id: "auto", label: "Auto", hint: "Prefer free Groq, else Claude" },
+  { id: "groq", label: "Groq (free)", hint: "Requires GROQ_API_KEY" },
+  { id: "anthropic", label: "Anthropic Claude", hint: "Requires ANTHROPIC_API_KEY" },
+];
+
 export function TestsWorkbench({ feature }: { feature: Feature }) {
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const reqUploadRef = useRef<HTMLInputElement>(null);
 
   const [projectMode, setProjectMode] = useState<ProjectMode>("existing");
   const [inputMethod, setInputMethod] = useState<InputMethod>("folder");
@@ -58,12 +72,17 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
   const [testStyle, setTestStyle] = useState<TestStyle>("unit");
   const [entryPoint, setEntryPoint] = useState("");
   const [mockDependencies, setMockDependencies] = useState(true);
+  const [provider, setProvider] = useState<LlmProviderChoice>("auto");
+  const [providerAvail, setProviderAvail] = useState<{ anthropic: boolean; groq: boolean }>({
+    anthropic: false,
+    groq: false,
+  });
 
   const [output, setOutput] = useState("");
   const [validation, setValidation] = useState("");
   const [resultTab, setResultTab] = useState<ResultTab>("generated");
-  const [mode, setMode] = useState<"live" | "mock" | null>(null);
-  const [validationMode, setValidationMode] = useState<"live" | "mock" | null>(null);
+  const [mode, setMode] = useState<"live" | "free" | "mock" | null>(null);
+  const [validationMode, setValidationMode] = useState<"live" | "free" | "mock" | null>(null);
   const [loading, setLoading] = useState(false);
   const [validating, setValidating] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -87,6 +106,30 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
 
   const canValidate =
     projectMode === "existing" && Boolean(code.trim()) && Boolean(output.trim());
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/providers")
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.providers) {
+          setProviderAvail({
+            anthropic: Boolean(data.providers.anthropic),
+            groq: Boolean(data.providers.groq),
+          });
+        }
+        if (data.defaults?.preferred === "groq" || data.defaults?.preferred === "anthropic") {
+          setProvider("auto");
+        }
+      })
+      .catch(() => {
+        /* keep defaults */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function onSelectFolder(fileList: FileList | null) {
     if (!fileList?.length) return;
@@ -119,21 +162,29 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
     setFetching(kind);
     setError("");
     try {
-      const url = kind === "req" ? reqUrl : sourceUrl;
-      const path = kind === "req" ? reqPath : sourcePath;
+      const urlOrPath = kind === "req" ? reqUrl || reqPath : sourceUrl || sourcePath;
+      const isFullUrl = /^https?:\/\//i.test(urlOrPath.trim());
       const res = await fetch("/api/github/fetch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          url: url || undefined,
+          url: isFullUrl ? urlOrPath.trim() : undefined,
           repo: repo || undefined,
-          path: path || undefined,
-          ref: branch || "main",
+          path: isFullUrl ? undefined : urlOrPath || undefined,
+          // Only send branch when using owner/repo + path (not a full tree URL),
+          // so a default "main" doesn't break branches like feat/tests.
+          ref: isFullUrl ? undefined : branch || "main",
           token: githubToken || undefined,
+          mode: kind === "req" ? "file" : "source",
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "GitHub fetch failed");
+      if (data.owner && data.repo) {
+        setRepo(`${data.owner}/${data.repo}`);
+      }
+      if (data.ref) setBranch(data.ref);
+
       const label = data.htmlUrl || `${data.owner}/${data.repo}/${data.path}`;
       if (kind === "req") {
         setRequirements(data.content);
@@ -141,8 +192,12 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
         setRequirementsInferred(false);
       } else {
         setCode(data.content);
-        setSourceLabel(label);
-        setProjectTree("");
+        setSourceLabel(
+          data.kind === "directory"
+            ? `${label} · ${data.fileCount ?? "?"} source files`
+            : label,
+        );
+        setProjectTree(data.tree || "");
         setFolderMeta(null);
       }
     } catch (e) {
@@ -150,6 +205,25 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
     } finally {
       setFetching(null);
     }
+  }
+
+  /** Optional local requirements file when the GitHub repo has none. */
+  function onUploadRequirements(file: File | null) {
+    if (!file) return;
+    if (file.size > 200_000) {
+      setError("Requirements file is too large (max ~200KB).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result || "");
+      setRequirements(text);
+      setReqLabel(`Uploaded: ${file.name}`);
+      setRequirementsInferred(!text.trim());
+      setError("");
+    };
+    reader.onerror = () => setError("Could not read requirements file.");
+    reader.readAsText(file);
   }
 
   async function generate() {
@@ -190,6 +264,7 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
           sourceLabel: sourceLabel || undefined,
           projectTree: projectTree || undefined,
           requirementsInferred: infer,
+          provider,
         }),
       });
       const data = await res.json();
@@ -230,6 +305,7 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
           framework,
           projectTree: projectTree || undefined,
           requirementsInferred: !requirements.trim() || requirementsInferred,
+          provider,
         }),
       });
       const data = await res.json();
@@ -298,6 +374,7 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
     setCopied(false);
     setEntryPoint("");
     if (folderInputRef.current) folderInputRef.current.value = "";
+    if (reqUploadRef.current) reqUploadRef.current.value = "";
   }
 
   function switchProjectMode(next: ProjectMode) {
@@ -522,7 +599,7 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className={labelClass}>
-                      Requirements path {projectMode === "existing" ? "(optional)" : ""}
+                      Requirements path on GitHub {projectMode === "existing" ? "(optional)" : ""}
                     </label>
                     <input
                       value={reqPath}
@@ -536,35 +613,71 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
                       disabled={fetching !== null}
                       className="mt-2 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-50"
                     >
-                      Load requirements
+                      Load from GitHub
                     </button>
                   </div>
                   {projectMode === "existing" && (
                     <div>
-                      <label className={labelClass}>Source path</label>
+                      <label className={labelClass}>Source path or folder URL</label>
                       <input
                         value={sourcePath}
                         onChange={(e) => setSourcePath(e.target.value)}
-                        placeholder="src/services/billing.ts"
+                        placeholder="src  or  https://github.com/owner/repo/tree/main/src"
                         className={fieldClass}
                       />
+                      <p className="mt-1 text-[10px] text-zinc-500">
+                        Folder URLs work, including branches with slashes — e.g.{" "}
+                        <code className="text-zinc-400">…/tree/feat/tests/src</code>
+                      </p>
                       <button
                         type="button"
                         onClick={() => void loadGitHubFile("source")}
                         disabled={fetching !== null}
                         className="mt-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 disabled:opacity-50"
                       >
-                        Load source
+                        {fetching === "source" ? "Loading…" : "Load source"}
                       </button>
                     </div>
                   )}
                 </div>
-                {(reqLabel || sourceLabel) && (
+
+                <div className="rounded-xl border border-dashed border-white/15 bg-[#0d0d15] p-3">
+                  <label className={labelClass}>
+                    Or upload requirements file (optional)
+                  </label>
+                  <p className="mb-2 text-[11px] text-zinc-500">
+                    Use this when the repo has no requirements doc — otherwise leave empty and
+                    behaviour will be inferred from source.
+                  </p>
+                  <input
+                    ref={reqUploadRef}
+                    type="file"
+                    accept=".md,.txt,.json,.yml,.yaml"
+                    className="hidden"
+                    onChange={(e) => onUploadRequirements(e.target.files?.[0] ?? null)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => reqUploadRef.current?.click()}
+                    className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-300 hover:bg-white/5"
+                  >
+                    Upload requirements…
+                  </button>
+                  {reqLabel.startsWith("Uploaded:") && (
+                    <p className="mt-2 text-[11px] text-emerald-400/80">{reqLabel}</p>
+                  )}
+                </div>
+
+                {(reqLabel || sourceLabel) && !reqLabel.startsWith("Uploaded:") && (
                   <div className="space-y-1 text-[11px] text-emerald-400/80">
                     {reqLabel && <p>Requirements: {reqLabel}</p>}
                     {sourceLabel && <p>Source: {sourceLabel}</p>}
                   </div>
                 )}
+                {sourceLabel && reqLabel.startsWith("Uploaded:") && (
+                  <p className="text-[11px] text-emerald-400/80">Source: {sourceLabel}</p>
+                )}
+
                 <div>
                   <label className={labelClass}>
                     Requirements{" "}
@@ -580,8 +693,8 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
                     }}
                     placeholder={
                       projectMode === "existing"
-                        ? "Optional — leave empty to infer from source…"
-                        : "Requirements for the new system (or load from GitHub above)…"
+                        ? "Optional — load from GitHub, upload a file, or leave empty to infer…"
+                        : "Requirements for the new system (GitHub load or upload above)…"
                     }
                     spellCheck={false}
                     className="h-36 w-full resize-none rounded-xl border border-white/10 bg-[#0d0d15] p-3 font-mono text-sm text-zinc-100 outline-none focus:border-emerald-500/60"
@@ -603,6 +716,36 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
 
           <section className="rounded-2xl border border-white/10 bg-[#12121b] p-4">
             <h2 className="mb-3 text-sm font-semibold text-zinc-200">Test options</h2>
+            <div className="mb-4">
+              <label className={labelClass}>LLM API for generate &amp; validate</label>
+              <div className="grid gap-2 sm:grid-cols-3">
+                {LLM_CHOICES.map((p) => {
+                  const configured =
+                    p.id === "auto"
+                      ? providerAvail.anthropic || providerAvail.groq
+                      : p.id === "groq"
+                        ? providerAvail.groq
+                        : providerAvail.anthropic;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setProvider(p.id)}
+                      className={`rounded-xl px-3 py-2.5 text-left text-xs transition ${
+                        provider === p.id
+                          ? "bg-emerald-500/20 text-emerald-100 ring-1 ring-emerald-500/40"
+                          : "border border-white/10 text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+                      }`}
+                    >
+                      <div className="font-semibold">{p.label}</div>
+                      <div className="mt-0.5 text-[10px] opacity-80">
+                        {configured ? p.hint.replace("Requires ", "Ready · ") : p.hint}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className={labelClass}>Framework</label>
@@ -773,12 +916,18 @@ export function TestsWorkbench({ feature }: { feature: Feature }) {
               {activeMode && (
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    activeMode === "live"
-                      ? "bg-emerald-500/15 text-emerald-300"
-                      : "bg-amber-500/15 text-amber-300"
+                    activeMode === "mock"
+                      ? "bg-amber-500/15 text-amber-300"
+                      : activeMode === "free"
+                        ? "bg-sky-500/15 text-sky-300"
+                        : "bg-emerald-500/15 text-emerald-300"
                   }`}
                 >
-                  {activeMode === "live" ? "Live · Claude" : "Mock mode"}
+                  {activeMode === "free"
+                    ? "Free · Groq"
+                    : activeMode === "live"
+                      ? "Live · Claude"
+                      : "Mock mode"}
                 </span>
               )}
             </div>
