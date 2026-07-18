@@ -11,7 +11,13 @@ Structure your answer with these sections:
 ## Security Issues
 ## Performance
 ## Style & Maintainability
-For each finding use a bullet with a severity tag [critical] [high] [medium] [low], the location, and a suggested fix. If a section has no findings, write "None found".`,
+
+Rules for every finding:
+- Start the bullet with a severity tag: [critical], [high], [medium], or [low].
+- Within each section, order findings by severity (critical first).
+- State the location (line number or the smallest identifying snippet), the concrete problem, and a specific suggested fix — ideally with a short corrected code snippet.
+- Do not invent issues. If a section has no findings, write "None found".
+- End with a one-line overall risk verdict: Ship / Ship with fixes / Do not ship.`,
   mock: `## Summary
 Reviewed the snippet in **mock mode** (no API key set). Overall structure is reasonable but there are a few correctness and security concerns.
 

@@ -11,6 +11,31 @@ export function FeatureWorkbench({ feature }: { feature: Feature }) {
   const [mode, setMode] = useState<"live" | "mock" | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [ghUrl, setGhUrl] = useState("");
+  const [fetching, setFetching] = useState(false);
+
+  async function loadFromGithub() {
+    if (!ghUrl.trim()) {
+      setError("Paste a link to a file on GitHub.");
+      return;
+    }
+    setFetching(true);
+    setError("");
+    try {
+      const res = await fetch("/api/fetch-source", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: ghUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not load file");
+      setInput(data.content);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load file.");
+    } finally {
+      setFetching(false);
+    }
+  }
 
   async function run() {
     if (!input.trim()) {
@@ -63,6 +88,24 @@ export function FeatureWorkbench({ feature }: { feature: Feature }) {
               className="w-40 rounded-lg border border-white/10 bg-[#0d0d15] px-2.5 py-1 text-xs text-zinc-300 outline-none focus:border-fuchsia-500/60"
             />
           </div>
+          {feature.supportsGithubUrl && (
+            <div className="mb-3 flex gap-2">
+              <input
+                value={ghUrl}
+                onChange={(e) => setGhUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !fetching && loadFromGithub()}
+                placeholder="Load a file from a GitHub URL (github.com/owner/repo/blob/…)"
+                className="flex-1 rounded-lg border border-white/10 bg-[#0d0d15] px-2.5 py-1.5 text-xs text-zinc-300 outline-none focus:border-fuchsia-500/60"
+              />
+              <button
+                onClick={loadFromGithub}
+                disabled={fetching}
+                className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-zinc-300 transition hover:bg-white/5 disabled:opacity-50"
+              >
+                {fetching ? "Loading…" : "Load"}
+              </button>
+            </div>
+          )}
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
