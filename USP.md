@@ -17,10 +17,10 @@ Individual AI coding tools (GitHub Copilot, Cursor, **Claude Code**, ChatGPT/Cla
 They do **not**:
 
 - Remember the team’s standards across every review as a shared product surface
-- Link a requirement to the design, tests, and docs that came from it
+- Link a requirement to the design, review, tests, and docs that came from it
 - Tell you when documentation or tests went stale after a requirement changed
 - Give the whole team one shared, cited, auditable knowledge base over the repo
-- Keep a durable **artifact graph** (req → design → tests → docs) with drift detection
+- Keep a durable **artifact graph** (req → design → review → tests → docs) with drift detection
 
 **Result:** AI helps individuals ship code faster, but teams still lose the plot on *why* something exists and whether artifacts still match reality.
 
@@ -135,6 +135,23 @@ Legend: **Yes** = first-class / strong · **Partial** = limited or ad-hoc · **N
 | **Amazon Q** | AWS ecosystem assistance | Provider-agnostic, self-host, lifecycle graph |
 
 **Bottom line:** Competitors optimize **velocity of writing/changing code**. Nova optimizes **velocity + fidelity of the whole engineering process**.
+
+---
+
+## Cons & limitations (be honest with judges)
+
+| Limitation | What it means |
+| ---------- | ------------- |
+| **Not a coding agent** | Engineers still write/change code with Copilot, Cursor, Claude Code, etc. Nova reviews and traces; it does not replace implementation. |
+| **Same LLMs underneath** | Uses Groq/Anthropic like everyone else. Value is workflow + state (graph, RAG, drift), not a proprietary model. |
+| **Drift is content-hash based** | Stale = “parent text changed,” not a deep semantic proof that tests still fail. False positives/negatives possible vs perfect verification. |
+| **Hackathon-scale persistence** | Projects/indexes stored on local disk (`.nova/`), not a multi-tenant SaaS DB. Fine for demo; needs hardening for production. |
+| **Indexing caps** | File/chunk limits keep demos fast; huge monorepos need more infrastructure (better vector DB, incremental index). |
+| **AI review ≠ human / CI** | Findings can be wrong or incomplete. Pair with humans and real test runs — don’t ship on Nova alone. |
+| **Adoption cost** | Team must index repos and maintain the artifact chain. Value compounds with process; empty graph = little magic. |
+| **Chat not in the graph** | By design (avoids chat spam). Pinning chat answers as evidence is a future enhancement. |
+
+> **Frame for judges:** *We know the limits. We’re not claiming to replace Cursor or invent a new LLM — we’re claiming the missing continuity layer, and we’re clear about what still needs humans and coding tools.*
 
 ---
 
