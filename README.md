@@ -34,6 +34,7 @@ npm run dev                  # http://localhost:3000
 
 | Module                     | Page       | API route      | What it does                                          |
 | -------------------------- | ---------- | -------------- | ----------------------------------------------------- |
+| 🧠 Chat with your Codebase | `/chat`    | `/api/rag/*`   | Index a Git repo/folder, ask questions grounded in real code (RAG). |
 | 🔍 AI Code Review          | `/review`  | `/api/review`  | Bugs, security, performance, and style findings.      |
 | 🧪 Unit Test Generator     | `/tests`   | `/api/tests`   | Idiomatic test suite with edge cases.                 |
 | 📚 Docs & API Generator    | `/docs`    | `/api/docs`    | Clean developer/API documentation from code.          |
@@ -50,6 +51,8 @@ Browser ──> Next.js page ──> /api/<feature> route ──> lib/claude.ts 
 - `src/lib/prompts.ts` — system prompt + mock output per module (tune behaviour here).
 - `src/lib/features.ts` — feature registry (name, route, owner) driving nav + dashboard.
 - `src/components/FeatureWorkbench.tsx` — shared input/output UI reused by every page.
+- `src/lib/rag/` — RAG pipeline: `ingest` (git clone / local walk) → `chunk` → `embeddings`
+  (local transformers.js, no key) → `store` (in-memory + on-disk vector search).
 
 ---
 
