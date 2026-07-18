@@ -16,7 +16,8 @@ export const GEN: Record<Exclude<ArtifactKind, "requirement">, GenSpec> = {
     title: "Design",
     system: designPrompt.system,
     maxTokens: 3000,
-    instruction: (_k, content) => `Turn these requirements into a system design:\n\n${content}`,
+    instruction: (_k, content) =>
+      `Design for the following requirements. Match the user's focus — if they ask for database tables / schema / ERD, lead with concrete table designs (columns, types, keys, relationships), not a generic API+microservices document.\n\n${content}`,
   },
   review: {
     title: "Review",
