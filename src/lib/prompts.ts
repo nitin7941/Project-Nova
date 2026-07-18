@@ -3,6 +3,8 @@
  * Keeping them here lets teammates tune a module's behaviour in one place.
  */
 
+import type { DocType } from "@/lib/docsOptions";
+import { DOC_TYPES } from "@/lib/docsOptions";
 import type { TestFramework } from "@/lib/testFrameworks";
 
 export const reviewPrompt = {
@@ -222,14 +224,186 @@ describe("subject", () => {
   }
 }
 
-export const docsPrompt = {
-  system: `You are Project Nova's technical writer. Produce clear developer documentation in Markdown for the provided code or API.
-Include:
+const DOC_SECTION_GUIDES: Record<DocType, string> = {
+  "user-manual": `Structure:
 ## Overview
+## Who this is for
+## Getting started
+## Common tasks (numbered steps)
+## Tips & troubleshooting
+## Glossary (optional)
+Write for end users; prefer workflows over implementation detail.`,
+  technical: `Structure:
+## Overview
+## Architecture
+## Key modules
+## Data flow
+## Extension points
+## Examples (fenced code)
+Write for engineers; be accurate about APIs that appear in the source.`,
+  "api-reference": `Structure:
+## Overview
+## Authentication (if applicable)
+## Endpoints / Functions
+For each: signature or method+path, parameters, returns, errors, example.
+## Examples
+Prefer precise tables. If HTTP, document method, path, request/response shapes.`,
+  readme: `Structure:
+## What it is
+## Prerequisites
+## Install
+## Configuration
+## Quickstart
+## Next steps / links
+Keep it scannable and actionable for a first-time visitor.`,
+  runbook: `Structure:
+## Scope
+## Deploy / rollback
+## Health checks & monitoring
+## Common incidents
+## Recovery procedures
+## Escalation
+Be procedural and concrete — operators should be able to follow under pressure.`,
+  onboarding: `Structure:
+## Welcome & goals
+## Access & local setup
+## Repo map
+## First week checklist
+## Norms (PRs, tests, style)
+## Where to get help
+Orient a new contributor quickly without drowning them.`,
+  openapi: `Output format:
+Return EXACTLY ONE fenced code block tagged \`yaml\` containing a complete, valid OpenAPI 3.1 document. No prose before or after the block.
+The document must include:
+- openapi: 3.1.0
+- info (title, version, short description)
+- servers (use the provided base URL, else a sensible default like /api)
+- paths: each endpoint with its HTTP method(s), summary, parameters, requestBody (with schema), and responses (status codes with schemas)
+- components/schemas: reusable request and response models referenced via $ref
+- at least one example value per operation (request and/or response)
+Document ONLY endpoints/behaviour supported by the input; never invent endpoints or fields.`,
+};
+
+function isSpecDoc(docType: DocType): boolean {
+  return docType === "openapi";
+}
+
+function docsSystemFor(docType: DocType): string {
+  const meta = DOC_TYPES.find((t) => t.id === docType)!;
+  if (isSpecDoc(docType)) {
+    return `You are Project Nova's API specification engine. Generate a machine-readable OpenAPI/Swagger spec for the provided HTTP API.
+Focus: ${meta.promptFocus}
+
+${DOC_SECTION_GUIDES[docType]}
+
+Rules:
+- Output ONLY the spec inside the single fenced code block — no commentary before or after.
+- The spec MUST be valid OpenAPI 3.1 and internally consistent (every $ref resolves).
+- Infer paths, methods, and schemas from the provided source/answers; do NOT invent endpoints.
+- If information is missing, use conservative, clearly-typed placeholders rather than fabricating behaviour.`;
+  }
+  return `You are Project Nova's technical writer. Produce clear documentation in Markdown.
+Document type: ${meta.label}
+Focus: ${meta.promptFocus}
+
+${DOC_SECTION_GUIDES[docType]}
+
+Rules:
+- Prefer directory/project scope: use folder structure and multiple files together; do not treat the input as a single isolated file.
+- Be accurate and concise. Do not invent APIs, files, or behaviours that are not supported by the input.
+- Use fenced code blocks for examples.
+- If the input is insufficient, state assumptions briefly rather than fabricating detail.`;
+}
+
+export const docsPrompt = {
+  /** Default system prompt (technical docs) — used by Traceability and fallbacks. */
+  system: docsSystemFor("technical"),
+
+  systemFor(docType: DocType): string {
+    return docsSystemFor(docType);
+  },
+
+  mock(docType: DocType = "technical"): string {
+    const label = DOC_TYPES.find((t) => t.id === docType)?.label ?? "Documentation";
+    if (isSpecDoc(docType)) {
+      return `\`\`\`yaml
+openapi: 3.1.0
+info:
+  title: Project Nova API (mock sample)
+  version: 1.0.0
+  description: Offline sample spec — set GROQ_API_KEY or ANTHROPIC_API_KEY for a real spec.
+servers:
+  - url: /api
+paths:
+  /docs:
+    post:
+      summary: Generate documentation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DocsRequest'
+      responses:
+        '200':
+          description: Generated documentation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocsResponse'
+        '400':
+          description: Missing required input
+components:
+  schemas:
+    DocsRequest:
+      type: object
+      required: [docType, source]
+      properties:
+        docType:
+          type: string
+          example: openapi
+        source:
+          type: string
+          enum: [codebase, github, interview]
+        code:
+          type: string
+        answers:
+          type: object
+          additionalProperties:
+            type: string
+    DocsResponse:
+      type: object
+      properties:
+        text:
+          type: string
+        mode:
+          type: string
+          enum: [live, free]
+\`\`\``;
+    }
+    return `# ${label}
+
+Auto-generated documentation (**mock / offline sample**).
+
+## Overview
+This sample shows the structure Project Nova produces for **${label.toLowerCase()}** when no live LLM response is available.
+
 ## Usage
-## API Reference (functions/endpoints, parameters, return values)
-## Examples (with fenced code blocks)
-Be accurate and concise. If it is an HTTP API, document method, path, request/response shapes.`,
+1. Choose a documentation type.
+2. Provide source via codebase paste/upload, GitHub, or the guided interview.
+3. Generate and download the Markdown.
+
+## Examples
+
+\`\`\`ts
+// Example placeholder — replace with live generation
+export function greet(name: string) {
+  return \`Hello, \${name}\`;
+}
+\`\`\`
+
+> Provide \`GROQ_API_KEY\` or \`ANTHROPIC_API_KEY\` to generate documentation from your real inputs.`;
+  },
 };
 
 export const ragPrompt = {

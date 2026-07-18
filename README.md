@@ -114,8 +114,8 @@ Each stream has its own branch (already pushed). Work on your branch, open a PR 
 
 ### 👤 Vishal — Quality & Docs
 **Branches:** `feat/tests`, `feat/docs`
-- [ ] 🧪 **Test Generator** (`/tests`): framework selector (Jest / Vitest / pytest / JUnit), copy + download tests, stretch: run tests in a sandbox.
-- [ ] 📚 **Docs Generator** (`/docs`): OpenAPI/Swagger output for HTTP APIs, Markdown export/copy button.
+- [x] 🧪 **Test Generator** (`/tests`): framework selector (Jest / Vitest / pytest / JUnit), copy + download tests. _(Stretch: sandbox test run — not done.)_
+- [x] 📚 **Docs Generator** (`/docs`): OpenAPI/Swagger output for HTTP APIs, Markdown export/copy button. Also directory-based sources (local folder / GitHub / interview) and multiple doc types (user manual, technical, API reference, README, runbook, onboarding).
 
 ### 👤 Sahil — Design & UX
 **Branches:** `feat/design`, `feat/ux`

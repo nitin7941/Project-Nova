@@ -1,6 +1,6 @@
-import { FeatureWorkbench } from "@/components/FeatureWorkbench";
+import { DocsWorkbench } from "@/components/DocsWorkbench";
 import { featureBySlug } from "@/lib/features";
 
 export default function Page() {
-  return <FeatureWorkbench feature={featureBySlug("docs")!} />;
+  return <DocsWorkbench feature={featureBySlug("docs")!} />;
 }
