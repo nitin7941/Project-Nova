@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { complete } from "@/lib/claude";
+import { completeStream, isLiveMode } from "@/lib/claude";
 import { ragPrompt } from "@/lib/prompts";
 import { embedOne } from "@/lib/rag/embeddings";
 import { search } from "@/lib/rag/store";
@@ -42,14 +42,37 @@ export async function POST(req: Request) {
     const queryVector = await embedOne(question);
     const sources = await search(indexId, queryVector, 6);
 
-    const result = await complete({
+    const deltas = completeStream({
       system: ragPrompt.system,
       user: `Question: ${question}\n\nCode context:\n\n${buildContext(sources)}`,
       mock: buildMock(question, sources),
       maxTokens: 1500,
     });
 
-    return NextResponse.json({ answer: result.text, mode: result.mode, sources });
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        // First line: JSON header with retrieval sources + mode.
+        controller.enqueue(
+          encoder.encode(JSON.stringify({ sources, mode: isLiveMode ? "live" : "mock" }) + "\n"),
+        );
+        try {
+          for await (const delta of deltas) {
+            controller.enqueue(encoder.encode(delta));
+          }
+        } catch (e) {
+          controller.enqueue(encoder.encode(`\n[stream error: ${e instanceof Error ? e.message : "failed"}]`));
+        }
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+      },
+    });
   } catch (err) {
     console.error("[rag/chat]", err);
     const message = err instanceof Error ? err.message : "Failed to answer the question.";

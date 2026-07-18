@@ -66,18 +66,62 @@ export default function ChatPage() {
     setQuestion("");
     setMessages((m) => [...m, { role: "user", content: q }]);
     setAsking(true);
+
+    const scrollDown = () =>
+      requestAnimationFrame(() => threadRef.current?.scrollTo(0, threadRef.current.scrollHeight));
+
     try {
       const res = await fetch("/api/rag/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ indexId: index.id, question: q }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Request failed");
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", content: data.answer, sources: data.sources, mode: data.mode },
-      ]);
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Request failed");
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let headerParsed = false;
+      let answer = "";
+      // Add an empty assistant message we will fill as tokens stream in.
+      setMessages((m) => [...m, { role: "assistant", content: "" }]);
+
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        if (!headerParsed) {
+          const nl = buffer.indexOf("\n");
+          if (nl === -1) continue;
+          const header = JSON.parse(buffer.slice(0, nl));
+          buffer = buffer.slice(nl + 1);
+          headerParsed = true;
+          setMessages((m) => {
+            const copy = [...m];
+            copy[copy.length - 1] = {
+              role: "assistant",
+              content: "",
+              sources: header.sources,
+              mode: header.mode,
+            };
+            return copy;
+          });
+        }
+
+        answer += buffer;
+        buffer = "";
+        const current = answer;
+        setMessages((m) => {
+          const copy = [...m];
+          copy[copy.length - 1] = { ...copy[copy.length - 1], content: current };
+          return copy;
+        });
+        scrollDown();
+      }
     } catch (e) {
       setMessages((m) => [
         ...m,
@@ -85,7 +129,7 @@ export default function ChatPage() {
       ]);
     } finally {
       setAsking(false);
-      requestAnimationFrame(() => threadRef.current?.scrollTo(0, threadRef.current.scrollHeight));
+      scrollDown();
     }
   }
 
