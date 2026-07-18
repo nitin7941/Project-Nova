@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { complete } from "@/lib/claude";
+import { complete, parseProviderChoice } from "@/lib/claude";
 import { reviewPrompt } from "@/lib/prompts";
 import { getProjectContext, withProjectContext } from "@/lib/rag/context";
 
 export async function POST(req: Request) {
   try {
-    const { code, language, indexId } = await req.json();
+    const { code, language, provider, indexId } = await req.json();
     if (!code || typeof code !== "string") {
       return NextResponse.json({ error: "Field 'code' is required." }, { status: 400 });
     }
@@ -14,14 +14,19 @@ export async function POST(req: Request) {
 
     const result = await complete({
       system: reviewPrompt.system,
-      user: withProjectContext(context, `Language: ${language || "auto-detect"}\n\nReview this code:\n\n${code}`),
-      mock: reviewPrompt.mock,
+      user: withProjectContext(
+        context,
+        `Language: ${language || "auto-detect"}\n\nReview this code:\n\n${code}`,
+      ),
       maxTokens: 2048,
+      provider: parseProviderChoice(provider),
     });
 
     return NextResponse.json({ ...result, sources });
   } catch (err) {
     console.error("[review]", err);
-    return NextResponse.json({ error: "Failed to generate review." }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Failed to generate review.";
+    const status = /not configured|No LLM provider/i.test(message) ? 400 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

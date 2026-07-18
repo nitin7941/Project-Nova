@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Markdown } from "@/components/Markdown";
+import { ProviderSelect } from "@/components/ProviderSelect";
 import type { Feature } from "@/lib/features";
+import type { CompletionMode, LlmProviderId } from "@/lib/claude";
+
+function modeBadge(mode: CompletionMode) {
+  if (mode === "live") return { label: "Live · Claude", className: "bg-emerald-500/15 text-emerald-300" };
+  return { label: "Free · Groq", className: "bg-sky-500/15 text-sky-300" };
+}
 
 interface ProjectOption {
   id: string;
@@ -22,7 +29,8 @@ export function FeatureWorkbench({ feature }: { feature: Feature }) {
   const [input, setInput] = useState("");
   const [language, setLanguage] = useState("");
   const [output, setOutput] = useState("");
-  const [mode, setMode] = useState<"live" | "mock" | null>(null);
+  const [mode, setMode] = useState<CompletionMode | null>(null);
+  const [provider, setProvider] = useState<LlmProviderId>("auto");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [ghUrl, setGhUrl] = useState("");
@@ -79,7 +87,12 @@ export function FeatureWorkbench({ feature }: { feature: Feature }) {
       const res = await fetch(feature.api, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: input, language, indexId: indexId || undefined }),
+        body: JSON.stringify({
+          code: input,
+          language,
+          provider,
+          indexId: indexId || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Request failed");
@@ -95,16 +108,19 @@ export function FeatureWorkbench({ feature }: { feature: Feature }) {
 
   return (
     <div>
-      <div className="mb-6 flex items-start gap-4">
-        <div
-          className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${feature.accent} text-2xl`}
-        >
-          {feature.icon}
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div
+            className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br ${feature.accent} text-2xl`}
+          >
+            {feature.icon}
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">{feature.name}</h1>
+            <p className="text-zinc-400">{feature.tagline}</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">{feature.name}</h1>
-          <p className="text-zinc-400">{feature.tagline}</p>
-        </div>
+        <ProviderSelect value={provider} onChange={setProvider} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -191,14 +207,8 @@ export function FeatureWorkbench({ feature }: { feature: Feature }) {
           <div className="mb-3 flex items-center justify-between">
             <label className="text-sm font-medium text-zinc-300">Result</label>
             {mode && (
-              <span
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  mode === "live"
-                    ? "bg-emerald-500/15 text-emerald-300"
-                    : "bg-amber-500/15 text-amber-300"
-                }`}
-              >
-                {mode === "live" ? "Live · Claude" : "Mock mode"}
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${modeBadge(mode).className}`}>
+                {modeBadge(mode).label}
               </span>
             )}
           </div>

@@ -60,3 +60,11 @@ body {
   font-size: 0.82rem;
   line-height: 1.5;
 }
+
+/* Mermaid diagrams in design output */
+.mermaid-diagram svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
