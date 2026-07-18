@@ -68,3 +68,35 @@ body {
   height: auto;
   margin: 0 auto;
 }
+
+/* UX polish: loading skeletons + shimmer */
+@keyframes nova-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.nova-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: nova-shimmer 1.4s ease-in-out infinite;
+}
+
+.nova-shimmer-text {
+  background: linear-gradient(
+    90deg,
+    #a1a1aa 0%,
+    #f5f5ff 45%,
+    #a1a1aa 90%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: nova-shimmer 1.6s ease-in-out infinite;
+}
+

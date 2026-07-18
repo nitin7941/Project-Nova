@@ -4,9 +4,16 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Markdown } from "@/components/Markdown";
 import { ProviderSelect } from "@/components/ProviderSelect";
+import { LoadingOutput } from "@/components/LoadingOutput";
+import { RunHistoryPanel } from "@/components/RunHistoryPanel";
 import { downloadMarkdown, exportDesignPdf } from "@/lib/exportDesign";
 import type { Feature } from "@/lib/features";
 import type { CompletionMode, LlmProviderId } from "@/lib/claude";
+import {
+  addRunHistoryEntry,
+  loadRunHistory,
+  type RunHistoryEntry,
+} from "@/lib/runHistory";
 
 type ChatTurn = { role: "user" | "assistant"; content: string };
 
@@ -50,8 +57,44 @@ export function DesignWorkbench({ feature }: { feature: Feature }) {
       .catch(() => setProjects([]));
   }, []);
 
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("nova-restore-run");
+      if (!raw) return;
+      const { featureSlug, id } = JSON.parse(raw) as { featureSlug?: string; id?: string };
+      if (featureSlug !== feature.slug || !id) return;
+      sessionStorage.removeItem("nova-restore-run");
+      const entry = loadRunHistory().find((e) => e.id === id);
+      if (entry) restoreRun(entry);
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feature.slug]);
+
   function shortSource(s: string) {
     return s.replace(/\.git$/, "").split("/").slice(-2).join("/");
+  }
+
+  function restoreRun(entry: RunHistoryEntry) {
+    setInput(entry.input);
+    setOutput(entry.output);
+    setMode((entry.mode as CompletionMode) || null);
+    setHistory([]);
+    setRefine("");
+    setError("");
+    setSources([]);
+  }
+
+  function recordRun(inputText: string, outputText: string, runMode?: string) {
+    addRunHistoryEntry({
+      featureSlug: feature.slug,
+      featureName: feature.name,
+      input: inputText,
+      output: outputText,
+      mode: runMode,
+    });
+    window.dispatchEvent(new Event("nova-run-history"));
   }
 
   async function handleExportPdf() {
@@ -118,6 +161,7 @@ export function DesignWorkbench({ feature }: { feature: Feature }) {
       setOutput(data.text);
       setMode(data.mode);
       setSources(data.sources ?? []);
+      recordRun(kind === "initial" ? requirements : input, data.text, data.mode);
       if (kind === "refine") setRefine("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
@@ -262,11 +306,21 @@ export function DesignWorkbench({ feature }: { feature: Feature }) {
             ref={resultRef}
             className="max-h-[36rem] min-h-80 overflow-y-auto rounded-xl border border-white/10 bg-[#0d0d15] p-4"
           >
-            {output ? (
-              <Markdown content={output} />
+            {loading && !output ? (
+              <LoadingOutput label="Designing with Nova…" />
+            ) : output ? (
+              <div className={loading ? "opacity-70 transition" : ""}>
+                <Markdown content={output} />
+                {loading && (
+                  <p className="mt-3 flex items-center gap-2 text-xs text-amber-300/90">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-400" />
+                    Refining…
+                  </p>
+                )}
+              </div>
             ) : (
               <p className="text-sm text-zinc-500">
-                {loading ? "Asking Nova…" : "Architecture write-up and Mermaid diagram appear here."}
+                Architecture write-up and Mermaid diagram appear here.
               </p>
             )}
           </div>
@@ -285,6 +339,11 @@ export function DesignWorkbench({ feature }: { feature: Feature }) {
           )}
         </section>
       </div>
+
+      <section className="mt-6">
+        <h2 className="mb-2 text-sm font-medium text-zinc-400">Run history</h2>
+        <RunHistoryPanel featureSlug={feature.slug} onRestore={restoreRun} compact />
+      </section>
     </div>
   );
 }

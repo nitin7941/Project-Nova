@@ -4,8 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Markdown } from "@/components/Markdown";
 import { ProviderSelect } from "@/components/ProviderSelect";
+import { LoadingOutput } from "@/components/LoadingOutput";
+import { RunHistoryPanel } from "@/components/RunHistoryPanel";
 import type { Feature } from "@/lib/features";
 import type { CompletionMode, LlmProviderId } from "@/lib/claude";
+import {
+  addRunHistoryEntry,
+  loadRunHistory,
+  type RunHistoryEntry,
+} from "@/lib/runHistory";
 
 function modeBadge(mode: CompletionMode) {
   if (mode === "live") return { label: "Live · Claude", className: "bg-emerald-500/15 text-emerald-300" };
@@ -46,8 +53,42 @@ export function FeatureWorkbench({ feature }: { feature: Feature }) {
       .catch(() => setProjects([]));
   }, []);
 
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("nova-restore-run");
+      if (!raw) return;
+      const { featureSlug, id } = JSON.parse(raw) as { featureSlug?: string; id?: string };
+      if (featureSlug !== feature.slug || !id) return;
+      sessionStorage.removeItem("nova-restore-run");
+      const entry = loadRunHistory().find((e) => e.id === id);
+      if (entry) restoreRun(entry);
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feature.slug]);
+
   function shortSource(s: string) {
     return s.replace(/\.git$/, "").split("/").slice(-2).join("/");
+  }
+
+  function restoreRun(entry: RunHistoryEntry) {
+    setInput(entry.input);
+    setOutput(entry.output);
+    setMode((entry.mode as CompletionMode) || null);
+    setError("");
+    setSources([]);
+  }
+
+  function recordRun(inputText: string, outputText: string, runMode?: string) {
+    addRunHistoryEntry({
+      featureSlug: feature.slug,
+      featureName: feature.name,
+      input: inputText,
+      output: outputText,
+      mode: runMode,
+    });
+    window.dispatchEvent(new Event("nova-run-history"));
   }
 
   async function loadFromGithub() {
@@ -99,6 +140,7 @@ export function FeatureWorkbench({ feature }: { feature: Feature }) {
       setOutput(data.text);
       setMode(data.mode);
       setSources(data.sources ?? []);
+      recordRun(input, data.text, data.mode);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
@@ -213,12 +255,12 @@ export function FeatureWorkbench({ feature }: { feature: Feature }) {
             )}
           </div>
           <div className="h-80 overflow-y-auto rounded-xl border border-white/10 bg-[#0d0d15] p-4">
-            {output ? (
+            {loading && !output ? (
+              <LoadingOutput />
+            ) : output ? (
               <Markdown content={output} />
             ) : (
-              <p className="text-sm text-zinc-500">
-                {loading ? "Asking Nova…" : "Output will appear here."}
-              </p>
+              <p className="text-sm text-zinc-500">Output will appear here.</p>
             )}
           </div>
           {sources.length > 0 && (
@@ -238,6 +280,11 @@ export function FeatureWorkbench({ feature }: { feature: Feature }) {
           )}
         </section>
       </div>
+
+      <section className="mt-6">
+        <h2 className="mb-2 text-sm font-medium text-zinc-400">Run history</h2>
+        <RunHistoryPanel featureSlug={feature.slug} onRestore={restoreRun} compact />
+      </section>
     </div>
   );
 }

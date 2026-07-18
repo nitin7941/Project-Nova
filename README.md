@@ -120,7 +120,7 @@ Each stream has its own branch (already pushed). Work on your branch, open a PR 
 ### 👤 Sahil — Design & UX
 **Branches:** `feat/design`, `feat/ux`
 - [x] 🏗️ **Requirements → Design** (`/design`): render the Mermaid diagram visually (add `mermaid` client-side), export to Markdown/PDF, stretch: multi-turn refinement.
-- [ ] 🎨 **UX polish** (`feat/ux`): dashboard/landing polish, loading/streaming states, run history, mobile nav.
+- [x] 🎨 **UX polish** (`feat/ux`): dashboard/landing polish, loading/streaming states, run history, mobile nav.
 
 > **Convention:** work on your feature branch, keep prompts in `src/lib/prompts.ts`,
 > reuse UI via `FeatureWorkbench`, then open a PR into `main`. Rebase on `main` often.
