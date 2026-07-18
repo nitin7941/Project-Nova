@@ -87,7 +87,7 @@ export const features: Feature[] = [
     href: "/trace",
     api: "/api/trace/project",
     name: "Traceability & Drift",
-    tagline: "Link requirement → design → tests → docs, and flag what goes stale when upstream changes.",
+    tagline: "Link requirement → design → review → tests → docs, and flag what goes stale when upstream changes.",
     icon: "🕸️",
     accent: "from-rose-500 to-amber-600",
     inputLabel: "Requirement to trace",

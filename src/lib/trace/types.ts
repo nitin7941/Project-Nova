@@ -2,19 +2,28 @@
  * Types for Project Nova's artifact traceability graph.
  *
  * The thesis: a requirement flows through the lifecycle
- * (requirement → design → tests → docs) and Nova keeps the *links* between
- * every artifact. Because the links are stored, Nova can detect drift: when a
- * parent artifact changes, everything generated from it is flagged stale.
+ * (requirement → design → review → tests → docs) and Nova keeps the *links*
+ * between every artifact. Because the links are stored, Nova can detect drift:
+ * when a parent artifact changes, everything generated from it is flagged stale.
+ *
+ * Chat stays outside the graph (discovery layer). Review is a first-class node.
  */
 
-export type ArtifactKind = "requirement" | "design" | "tests" | "docs";
+export type ArtifactKind = "requirement" | "design" | "review" | "tests" | "docs";
 
-export const ARTIFACT_KINDS: ArtifactKind[] = ["requirement", "design", "tests", "docs"];
+export const ARTIFACT_KINDS: ArtifactKind[] = [
+  "requirement",
+  "design",
+  "review",
+  "tests",
+  "docs",
+];
 
 /** Which downstream artifacts can be generated from a given kind. */
 export const DOWNSTREAM: Record<ArtifactKind, ArtifactKind[]> = {
-  requirement: ["design", "tests", "docs"],
-  design: ["tests", "docs"],
+  requirement: ["design", "review", "tests", "docs"],
+  design: ["review", "tests", "docs"],
+  review: ["tests", "docs"],
   tests: ["docs"],
   docs: [],
 };

@@ -6,7 +6,7 @@
 
 ## One-line pitch
 
-> **Nova is not autocomplete.** It is the team governance and continuity layer for the software lifecycle — grounded in *your* repo, linking requirements → design → tests → docs, citing sources, and flagging drift when upstream artifacts change.
+> **Nova is not autocomplete.** It is the team governance and continuity layer for the software lifecycle — grounded in *your* repo, linking requirements → design → review → tests → docs, citing sources, and flagging drift when upstream artifacts change.
 
 ---
 
@@ -48,10 +48,11 @@ Every generative feature can optionally pull **project context** from an indexed
 
 ### 1. Lifecycle continuity, not isolated chat
 
-Nova stores **artifact links**: requirement → design → tests → docs.
+Nova stores **artifact links**: requirement → design → **review** → tests → docs.
 
 Ask: *“Why does this test exist?”* → follow the parent chain.  
-Change a requirement → Nova marks downstream design/tests/docs **stale** until regenerated or acknowledged.
+Change a requirement → Nova marks downstream design/review/tests/docs **stale** until regenerated or acknowledged.  
+Chat is the discovery layer (not a graph node); Review is a first-class artifact.
 
 No mainstream IDE assistant maintains this as a first-class, queryable graph.
 
@@ -77,7 +78,7 @@ RAG indexes a Git URL or local folder. Embeddings run **locally** (transformers.
 
 1. **Index** a small repo → ask *“Where is auth handled?”* → show citations.  
 2. Open **Review / Tests / Docs** with **Project context** selected → show grounded output + sources.  
-3. Open **Traceability** → paste a requirement → generate Design → Tests → Docs.  
+3. Open **Traceability** → paste a requirement → generate Design → **Review** → Tests → Docs.  
 4. **Edit the requirement** → amber **stale** badges appear → **Regenerate** → back in sync.  
 5. Mention: *“Claude Code / Copilot wrote the next change. Nova kept the chain of custody.”*
 
@@ -115,7 +116,7 @@ Legend: **Yes** = first-class / strong · **Partial** = limited or ad-hoc · **N
 | Who it serves | Individual developer (or pair) in a terminal session | Whole team with shared indexes, roles, and artifacts |
 | Strength | Fast implementation loops: “fix this bug”, “add this feature”, multi-step tool use | Continuity & governance: *why* artifacts exist, whether they still match, who can index/generate |
 | Repo context | Strong local workspace awareness in-session | Indexed RAG + optional grounding on every feature, with `file:line` citations |
-| Lifecycle artifacts | Ephemeral chat / files you choose to keep | First-class linked artifacts: requirement → design → tests → docs |
+| Lifecycle artifacts | Ephemeral chat / files you choose to keep | First-class linked artifacts: requirement → design → review → tests → docs |
 | Drift | You notice manually (or re-ask) | Product feature: parent change → children marked **stale** |
 | Standards | Per-project instructions (`CLAUDE.md`) for that agent | Central prompts + RBAC applied to every user of the platform |
 | Complements | Use Claude Code to **write/change code** | Use Nova to **govern, ground, and keep the chain of custody** |

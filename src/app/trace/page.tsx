@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Markdown } from "@/components/Markdown";
 import { ARTIFACT_KINDS, DOWNSTREAM } from "@/lib/trace/types";
 import type { ArtifactKind, ArtifactView, TraceGraph } from "@/lib/trace/types";
@@ -24,6 +23,7 @@ interface IndexOption {
 const KIND_META: Record<ArtifactKind, { label: string; icon: string; accent: string; badge: string }> = {
   requirement: { label: "Requirement", icon: "📋", accent: "from-amber-500 to-orange-600", badge: "bg-amber-500/15 text-amber-300" },
   design: { label: "Design", icon: "🏗️", accent: "from-sky-500 to-blue-600", badge: "bg-sky-500/15 text-sky-300" },
+  review: { label: "Review", icon: "🔍", accent: "from-fuchsia-500 to-purple-600", badge: "bg-fuchsia-500/15 text-fuchsia-300" },
   tests: { label: "Tests", icon: "🧪", accent: "from-emerald-500 to-teal-600", badge: "bg-emerald-500/15 text-emerald-300" },
   docs: { label: "Docs", icon: "📚", accent: "from-violet-500 to-fuchsia-600", badge: "bg-violet-500/15 text-violet-300" },
 };
@@ -171,8 +171,9 @@ export default function TracePage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Traceability &amp; Drift</h1>
           <p className="text-zinc-400">
-            Link a requirement to its design, tests, and docs — then let Nova flag what goes{" "}
+            Link a requirement to design, review, tests, and docs — then let Nova flag what goes{" "}
             <span className="text-amber-300">stale</span> when an upstream artifact changes.
+            Chat stays the discovery layer (not a graph node).
           </p>
         </div>
       </div>
@@ -283,7 +284,7 @@ export default function TracePage() {
                 )}
               </div>
 
-              <div className="grid gap-4 md:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 {ARTIFACT_KINDS.map((kind) => {
                   const items = graph.artifacts.filter((a) => a.kind === kind);
                   const meta = KIND_META[kind];

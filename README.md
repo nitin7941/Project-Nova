@@ -20,8 +20,8 @@ single feature — it's four things a per-file IDE assistant structurally doesn'
    can pull **project context** from an indexed codebase (RAG) and cite `file:line`.
 2. **A team platform, not a personal assistant.** Role-based access, one shared index, and
    **standards-as-code** in `src/lib/prompts.ts` (change once → applies to everyone).
-3. **Traceability + drift.** Link requirement → design → tests → docs; when upstream changes,
-   Nova flags downstream artifacts as **stale**.
+3. **Traceability + drift.** Link requirement → design → review → tests → docs; when upstream
+   changes, Nova flags downstream artifacts as **stale**. (Chat stays discovery, not a graph node.)
 4. **Provenance & data control.** Cited sources; local embeddings; only retrieved snippets
    reach the LLM; provider-flexible and self-hostable.
 
@@ -82,7 +82,7 @@ npm run dev                  # http://localhost:3000
 | 🧪 Unit Test Generator     | `/tests`   | `/api/tests`        | Idiomatic test suite with edge cases.                 |
 | 📚 Docs & API Generator    | `/docs`    | `/api/docs`         | Clean developer/API documentation from code.          |
 | 🏗️ Requirements → Design   | `/design`  | `/api/design`       | System design + Mermaid diagram from requirements.    |
-| 🕸️ Traceability & Drift    | `/trace`   | `/api/trace/*`      | Link req → design → tests → docs; flag stale artifacts. |
+| 🕸️ Traceability & Drift    | `/trace`   | `/api/trace/*`      | Link req → design → review → tests → docs; flag stale. |
 
 ### Architecture at a glance
 
