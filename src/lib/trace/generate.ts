@@ -4,7 +4,6 @@ import type { ArtifactKind } from "./types";
 interface GenSpec {
   title: string;
   system: string;
-  mock: string;
   /** Build the instruction for turning a parent artifact into this kind. */
   instruction: (parentKind: ArtifactKind, parentContent: string) => string;
   maxTokens: number;
@@ -16,23 +15,23 @@ export const GEN: Record<Exclude<ArtifactKind, "requirement">, GenSpec> = {
   design: {
     title: "Design",
     system: designPrompt.system,
-    mock: designPrompt.mock,
     maxTokens: 3000,
     instruction: (_k, content) => `Turn these requirements into a system design:\n\n${content}`,
   },
   tests: {
     title: "Tests",
-    system: testsPrompt.system,
-    mock: testsPrompt.mock,
+    // Greenfield-style: parent is a requirement or design, not source code.
+    system: testsPrompt.systemNew,
     maxTokens: 2048,
     instruction: (k, content) =>
-      `Generate a unit test suite that verifies the following ${k}:\n\n${content}`,
+      `Generate a test-case package that verifies the following ${k}. ` +
+      `Use Vitest for the suggested unit-test skeleton unless another framework is clearly implied.\n\n${content}`,
   },
   docs: {
     title: "Docs",
     system: docsPrompt.system,
-    mock: docsPrompt.mock,
     maxTokens: 2048,
-    instruction: (k, content) => `Write developer documentation for the following ${k}:\n\n${content}`,
+    instruction: (k, content) =>
+      `Write developer documentation for the following ${k}:\n\n${content}`,
   },
 };

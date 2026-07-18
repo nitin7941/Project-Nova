@@ -31,7 +31,7 @@ export interface Artifact {
   /** Hash of the parent's content at generation time — the drift anchor. */
   parentHash: string | null;
   /** How the content was produced. */
-  mode: "live" | "mock" | "manual";
+  mode: "live" | "free" | "manual";
 }
 
 export interface TraceProject {
