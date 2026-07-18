@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { complete } from "@/lib/claude";
+import { complete, parseProviderChoice } from "@/lib/claude";
 import { testsPrompt } from "@/lib/prompts";
 import { isTestFramework, type TestFramework } from "@/lib/testFrameworks";
 import {
@@ -36,6 +36,7 @@ export async function POST(req: Request) {
       sourceLabel,
       projectTree,
       requirementsInferred,
+      provider,
     } = body as {
       projectMode?: string;
       requirements?: string;
@@ -51,6 +52,7 @@ export async function POST(req: Request) {
       sourceLabel?: string;
       projectTree?: string;
       requirementsInferred?: boolean;
+      provider?: string;
     };
 
     const mode: ProjectMode = isProjectMode(projectMode) ? projectMode : "existing";
@@ -96,6 +98,7 @@ export async function POST(req: Request) {
         ].join("\n"),
         mock: testsPrompt.mockNew(selected),
         maxTokens: 3072,
+        provider: parseProviderChoice(provider),
       });
 
       return NextResponse.json({
@@ -142,6 +145,7 @@ export async function POST(req: Request) {
         .join("\n"),
       mock: testsPrompt.mockExisting(selected),
       maxTokens: 4096,
+      provider: parseProviderChoice(provider),
     });
 
     return NextResponse.json({
@@ -154,6 +158,8 @@ export async function POST(req: Request) {
     });
   } catch (err) {
     console.error("[tests]", err);
-    return NextResponse.json({ error: "Failed to generate tests." }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Failed to generate tests.";
+    const status = /not configured|No LLM provider/i.test(message) ? 400 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

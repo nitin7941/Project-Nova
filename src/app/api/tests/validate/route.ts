@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { complete } from "@/lib/claude";
+import { complete, parseProviderChoice } from "@/lib/claude";
 import { testsPrompt } from "@/lib/prompts";
 
 /**
  * POST /api/tests/validate
  * Existing-project: validate generated tests against source (+ optional requirements).
- * If requirements are missing, validate against behaviour inferred from source.
+ * provider: auto | anthropic | groq
  */
 export async function POST(req: Request) {
   try {
@@ -20,6 +20,7 @@ export async function POST(req: Request) {
       framework,
       projectTree,
       requirementsInferred,
+      provider,
     } = body as {
       requirements?: string;
       code?: string;
@@ -30,6 +31,7 @@ export async function POST(req: Request) {
       framework?: string;
       projectTree?: string;
       requirementsInferred?: boolean;
+      provider?: string;
     };
 
     const reqText = typeof requirements === "string" ? requirements.trim() : "";
@@ -77,11 +79,14 @@ export async function POST(req: Request) {
         .join("\n"),
       mock: testsPrompt.mockValidate(),
       maxTokens: 2048,
+      provider: parseProviderChoice(provider),
     });
 
     return NextResponse.json({ ...result, requirementsInferred: inferReqs });
   } catch (err) {
     console.error("[tests/validate]", err);
-    return NextResponse.json({ error: "Failed to validate tests." }, { status: 500 });
+    const message = err instanceof Error ? err.message : "Failed to validate tests.";
+    const status = /not configured|No LLM provider/i.test(message) ? 400 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }
