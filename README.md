@@ -17,23 +17,36 @@ Nova makes a **team** faster and safer across the **whole lifecycle**. The moat 
 single feature — it's four things a per-file IDE assistant structurally doesn't do:
 
 1. **Grounded in *your* repo, everywhere.** Every feature — review, tests, docs, design —
-   can pull **project context** from an indexed codebase (RAG) and cite `file:line`. The AI
-   answers based on *how this project actually works*, not generic patterns. Pick a project
-   from the "Project context" dropdown in any tool.
-2. **A team platform, not a personal assistant.** Role-based access, one shared indexed
-   knowledge base, and **your standards enforced for everyone** (review checklist, security
-   rubric, and prompts live in `src/lib/prompts.ts` — change once, applies to the whole team).
-3. **Provenance & citations.** Grounded answers show the exact snippets used, so reviews and
-   designs are auditable — not an opaque black box.
-4. **Data control.** Embeddings run **locally** (no key, nothing leaves the box); only tiny
-   retrieved snippets reach the LLM; provider-agnostic and self-hostable.
+   can pull **project context** from an indexed codebase (RAG) and cite `file:line`.
+2. **A team platform, not a personal assistant.** Role-based access, one shared index, and
+   **standards-as-code** in `src/lib/prompts.ts` (change once → applies to everyone).
+3. **Traceability + drift.** Link requirement → design → tests → docs; when upstream changes,
+   Nova flags downstream artifacts as **stale**.
+4. **Provenance & data control.** Cited sources; local embeddings; only retrieved snippets
+   reach the LLM; provider-flexible and self-hostable.
 
 > **Pitch line:** *"We're not competing with autocomplete. Nova is the governance and
-> continuity layer on top of it — it remembers the project, links requirements to code to
-> tests to docs, enforces our standards, cites its sources, and keeps our code on our
-> infrastructure."*
+> continuity layer on top of it — it remembers the project, links requirements to design to
+> tests to docs, enforces our standards, cites its sources, and flags drift."*
 
-New to the codebase? Read [ONBOARDING.md](ONBOARDING.md).
+**Presentable USP + full competitor table:** [USP.md](USP.md)  
+**New engineer onboarding:** [ONBOARDING.md](ONBOARDING.md)
+
+### Nova vs other AI platforms (summary)
+
+| Capability | Nova | Copilot | Cursor | Cody | ChatGPT / Claude |
+| ---------- | :--: | :-----: | :----: | :--: | :--------------: |
+| Repo RAG chat + citations | Yes | Partial | Yes | Yes | Partial |
+| Grounded review / tests / docs / design | Yes | — | Partial | Partial | — |
+| Requirements → architecture design | Yes | — | Partial | — | Partial |
+| Artifact traceability graph | **Yes** | — | — | — | — |
+| Drift / staleness detection | **Yes** | — | — | — | — |
+| Team standards + RBAC (product focus) | **Yes** | Org IAM | Org IAM | Org IAM | — |
+| Local embeddings / self-host web app | **Yes** | — | — | Enterprise | — |
+| Inline IDE autocomplete | —* | **Yes** | **Yes** | Partial | — |
+
+\*By design — Nova is a **lifecycle web platform**, not an IDE autocomplete plugin.  
+Full breakdown and objection handling → [USP.md](USP.md).
 
 ---
 
@@ -62,13 +75,14 @@ npm run dev                  # http://localhost:3000
 
 ## 🧩 Features (each is an independent module)
 
-| Module                     | Page       | API route      | What it does                                          |
-| -------------------------- | ---------- | -------------- | ----------------------------------------------------- |
-| 🧠 Chat with your Codebase | `/chat`    | `/api/rag/*`   | Index a Git repo/folder, ask questions grounded in real code (RAG). |
-| 🔍 AI Code Review          | `/review`  | `/api/review`  | Bugs, security, performance, and style findings.      |
-| 🧪 Unit Test Generator     | `/tests`   | `/api/tests`   | Idiomatic test suite with edge cases.                 |
-| 📚 Docs & API Generator    | `/docs`    | `/api/docs`    | Clean developer/API documentation from code.          |
-| 🏗️ Requirements → Design   | `/design`  | `/api/design`  | System design + Mermaid diagram from requirements.    |
+| Module                     | Page       | API route           | What it does                                          |
+| -------------------------- | ---------- | ------------------- | ----------------------------------------------------- |
+| 🧠 Chat with your Codebase | `/chat`    | `/api/rag/*`        | Index a Git repo/folder, ask questions grounded in real code (RAG). |
+| 🔍 AI Code Review          | `/review`  | `/api/review`       | Bugs, security, performance, and style findings.      |
+| 🧪 Unit Test Generator     | `/tests`   | `/api/tests`        | Idiomatic test suite with edge cases.                 |
+| 📚 Docs & API Generator    | `/docs`    | `/api/docs`         | Clean developer/API documentation from code.          |
+| 🏗️ Requirements → Design   | `/design`  | `/api/design`       | System design + Mermaid diagram from requirements.    |
+| 🕸️ Traceability & Drift    | `/trace`   | `/api/trace/*`      | Link req → design → tests → docs; flag stale artifacts. |
 
 ### Architecture at a glance
 
@@ -92,10 +106,11 @@ The scaffold is live and every module is isolated, so we can work in parallel.
 Each stream has its own branch (already pushed). Work on your branch, open a PR into `main`.
 
 ### 👤 Member 1 — Nitin (Lead · Code Review + Platform)
-**Branches:** `feat/review`, `feat/rag`
-- [ ] 🔍 **Code Review** (`/review`): tune `reviewPrompt`, add paste-a-diff, review a file from a GitHub URL.
-- [ ] 🧠 **RAG "chat with your codebase"** (`feat/rag`) — the biggest differentiator: index a repo, vector search, context-aware answers.
-- [ ] Platform glue: auth + role-based access, response streaming, deployment.
+**Branches:** `feat/review`, `feat/rag`, `feat/traceability`
+- [x] 🔍 **Code Review** (`/review`): GitHub URL loader + sharper review prompt.
+- [x] 🧠 **RAG "chat with your codebase"** — index a repo, vector search, context-aware answers.
+- [x] Platform: auth + RBAC, streaming, shared project context.
+- [x] 🕸️ **Traceability & drift** (`/trace`) — artifact graph + staleness detection.
 
 ### 👤 Vishal — Quality & Docs
 **Branches:** `feat/tests`, `feat/docs`

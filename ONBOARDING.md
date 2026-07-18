@@ -42,7 +42,7 @@ The golden rule: **a feature = a thin page + a thin API route + a system prompt.
 All heavy lifting (LLM calls, RAG, auth) lives in `src/lib` and is shared.
 
 ### Where to look, in order
-1. `README.md` — overview + run instructions.
+1. `README.md` — overview + run instructions. For the pitch / competitor story, read `USP.md`.
 2. `src/lib/features.ts` — the registry that drives the nav and dashboard. **Adding a feature starts here.**
 3. `src/lib/claude.ts` — the single entry point for all AI calls: `complete()` and `completeStream()`, with automatic mock fallback.
 4. `src/lib/prompts.ts` — each feature's system prompt + mock output. **Behaviour is tuned here, not in routes.**
