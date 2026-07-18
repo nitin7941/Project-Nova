@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { ingest } from "@/lib/rag/ingest";
 import { chunkFiles } from "@/lib/rag/chunk";
-import { embed } from "@/lib/rag/embeddings";
 import { saveIndex } from "@/lib/rag/store";
 
 // Indexing (clone + embed) can take a while for larger repos.
@@ -23,6 +22,9 @@ export async function POST(req: Request) {
     cleanup = result.cleanup;
 
     const chunks = chunkFiles(result.files);
+    // Dynamic import so this route can load even when ONNX isn't present;
+    // embed() then returns a clear JSON error on Vercel serverless.
+    const { embed } = await import("@/lib/rag/embeddings");
     const vectors = await embed(chunks.map((c) => c.text));
 
     const summary = await saveIndex({

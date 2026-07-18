@@ -104,9 +104,10 @@ export function FeatureWorkbench({ feature }: { feature: Feature }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: ghUrl }),
       });
-      const data = await res.json();
+      const { readJson } = await import("@/lib/http");
+      const data = await readJson<{ error?: string; content?: string }>(res);
       if (!res.ok) throw new Error(data.error || "Could not load file");
-      setInput(data.content);
+      setInput(data.content ?? "");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load file.");
     } finally {
@@ -135,12 +136,19 @@ export function FeatureWorkbench({ feature }: { feature: Feature }) {
           indexId: indexId || undefined,
         }),
       });
-      const data = await res.json();
+      const { readJson } = await import("@/lib/http");
+      const data = await readJson<{
+        error?: string;
+        text?: string;
+        mode?: "live" | "free";
+        sources?: Source[];
+      }>(res);
       if (!res.ok) throw new Error(data.error || "Request failed");
-      setOutput(data.text);
-      setMode(data.mode);
+      const text = data.text ?? "";
+      setOutput(text);
+      setMode(data.mode ?? null);
       setSources(data.sources ?? []);
-      recordRun(input, data.text, data.mode);
+      recordRun(input, text, data.mode);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {

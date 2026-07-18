@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { completeStream, isLiveMode } from "@/lib/claude";
 import { ragPrompt } from "@/lib/prompts";
-import { embedOne } from "@/lib/rag/embeddings";
 import { search } from "@/lib/rag/store";
 import type { RetrievedChunk } from "@/lib/rag/types";
 
@@ -39,6 +38,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Field 'question' is required." }, { status: 400 });
     }
 
+    const { embedOne } = await import("@/lib/rag/embeddings");
     const queryVector = await embedOne(question);
     const sources = await search(indexId, queryVector, 6);
 
