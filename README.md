@@ -67,12 +67,12 @@ Each stream has its own branch (already pushed). Work on your branch, open a PR 
 - [ ] 🧠 **RAG "chat with your codebase"** (`feat/rag`) — the biggest differentiator: index a repo, vector search, context-aware answers.
 - [ ] Platform glue: auth + role-based access, response streaming, deployment.
 
-### 👤 Member 2 — Quality & Docs
+### 👤 Vishal — Quality & Docs
 **Branches:** `feat/tests`, `feat/docs`
 - [ ] 🧪 **Test Generator** (`/tests`): framework selector (Jest / Vitest / pytest / JUnit), copy + download tests, stretch: run tests in a sandbox.
 - [ ] 📚 **Docs Generator** (`/docs`): OpenAPI/Swagger output for HTTP APIs, Markdown export/copy button.
 
-### 👤 Member 3 — Design & UX
+### 👤 Sahil — Design & UX
 **Branches:** `feat/design`, `feat/ux`
 - [ ] 🏗️ **Requirements → Design** (`/design`): render the Mermaid diagram visually (add `mermaid` client-side), export to Markdown/PDF, stretch: multi-turn refinement.
 - [ ] 🎨 **UX polish** (`feat/ux`): dashboard/landing polish, loading/streaming states, run history, mobile nav.

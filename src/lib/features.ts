@@ -11,6 +11,8 @@ export interface Feature {
   cta: string;
   /** Owner column so hackathon teammates can claim a module. */
   owner: string;
+  /** Show a "load a file from a GitHub URL" input in the workbench. */
+  supportsGithubUrl?: boolean;
 }
 
 export const features: Feature[] = [
@@ -39,6 +41,7 @@ export const features: Feature[] = [
     placeholder: "// Paste a function, file, or diff here...",
     cta: "Review code",
     owner: "Nitin",
+    supportsGithubUrl: true,
   },
   {
     slug: "tests",

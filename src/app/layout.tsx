@@ -11,7 +11,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>
+      {/* Browser extensions (e.g. Grammarly) inject attributes on <body>
+          before hydration; ignore those to avoid a false hydration warning. */}
+      <body suppressHydrationWarning>
         <Nav />
         <main className="mx-auto max-w-6xl px-4 pb-24 pt-8">{children}</main>
       </body>
