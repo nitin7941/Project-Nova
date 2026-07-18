@@ -6,7 +6,7 @@ Project Nova assists engineers end-to-end: it reviews code, flags bugs & securit
 issues, generates unit tests and documentation, and turns requirements into system
 designs. Built with **Next.js + TypeScript** and powered by **Anthropic Claude**.
 
-> Runs in **mock mode** with zero setup, so the demo always works. Add an API key to go live.
+> Add a free **Groq** key (or Anthropic for Claude). Choose the provider in each feature UI.
 
 ---
 
@@ -42,18 +42,21 @@ New to the codebase? Read [ONBOARDING.md](ONBOARDING.md).
 ```bash
 cd project-nova
 npm install
-cp .env.example .env.local   # optional: add your Anthropic key
+cp .env.example .env.local   # add GROQ_API_KEY and/or ANTHROPIC_API_KEY
 npm run dev                  # http://localhost:3000
 ```
 
 ### Environment
 
-| Variable            | Required | Description                                                        |
-| ------------------- | -------- | ------------------------------------------------------------------ |
-| `ANTHROPIC_API_KEY` | No\*     | Enables live Claude responses. Without it, the app runs in mock mode. |
-| `ANTHROPIC_MODEL`   | No       | Override the model (default `claude-3-5-sonnet-latest`).           |
+| Variable            | Required | Description |
+| ------------------- | -------- | ----------- |
+| `GROQ_API_KEY`      | Recommended | Free-tier LLM. Get one at [console.groq.com/keys](https://console.groq.com/keys). |
+| `GROQ_MODEL`        | No       | Override Groq model (default `llama-3.3-70b-versatile`). |
+| `ANTHROPIC_API_KEY` | No       | Live Claude when you want Anthropic. |
+| `ANTHROPIC_MODEL`   | No       | Override Claude model (default `claude-3-5-sonnet-latest`). |
 
-\*Not required for the demo — every feature returns a realistic mock when the key is absent.
+**LLM picker:** Auto / Groq (Free) / Anthropic (Claude).  
+**Auto order:** Groq → Anthropic (requires at least one key).
 
 ---
 
@@ -101,7 +104,7 @@ Each stream has its own branch (already pushed). Work on your branch, open a PR 
 
 ### 👤 Sahil — Design & UX
 **Branches:** `feat/design`, `feat/ux`
-- [ ] 🏗️ **Requirements → Design** (`/design`): render the Mermaid diagram visually (add `mermaid` client-side), export to Markdown/PDF, stretch: multi-turn refinement.
+- [x] 🏗️ **Requirements → Design** (`/design`): render the Mermaid diagram visually (add `mermaid` client-side), export to Markdown/PDF, stretch: multi-turn refinement.
 - [ ] 🎨 **UX polish** (`feat/ux`): dashboard/landing polish, loading/streaming states, run history, mobile nav.
 
 > **Convention:** work on your feature branch, keep prompts in `src/lib/prompts.ts`,

@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { features } from "@/lib/features";
-import { isLiveMode } from "@/lib/claude";
+import { hasAnthropic, hasGroq, providerLabel } from "@/lib/claude";
 
 export default function Home() {
+  const badgeClass = hasAnthropic
+    ? "bg-emerald-500/15 text-emerald-300"
+    : hasGroq
+      ? "bg-sky-500/15 text-sky-300"
+      : "bg-amber-500/15 text-amber-300";
+
   return (
     <div>
       <section className="py-10 text-center">
@@ -27,14 +33,9 @@ export default function Home() {
           >
             Try Code Review
           </Link>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              isLiveMode
-                ? "bg-emerald-500/15 text-emerald-300"
-                : "bg-amber-500/15 text-amber-300"
-            }`}
-          >
-            {isLiveMode ? "Live · Claude connected" : "Mock mode · set ANTHROPIC_API_KEY"}
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ${badgeClass}`}>
+            {providerLabel()}
+            {!hasAnthropic && !hasGroq ? " · set GROQ_API_KEY or ANTHROPIC_API_KEY" : " connected"}
           </span>
         </div>
       </section>
